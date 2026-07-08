@@ -206,7 +206,10 @@ const MIGRATION_SQL = [
     ('f27-11a','2027-11-02','Finados','nacional'),
     ('f27-11b','2027-11-15','Proclamação da República','nacional'),
     ('f27-11c','2027-11-20','Consciência Negra','nacional'),
-    ('f27-12','2027-12-25','Natal','nacional')`
+    ('f27-12','2027-12-25','Natal','nacional')`,
+
+  // Data migration: definir perfil correto da gestora autorizada
+  `UPDATE fp_usuarios SET perfil='gestora' WHERE email='vitoria.fonte@newelevadores.com' AND perfil IN ('admin','funcionario')`
 ];
 
 // ─── Entry point ───────────────────────────────────────────────────────────────
