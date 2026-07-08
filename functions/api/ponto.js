@@ -258,18 +258,29 @@ export async function onRequest(context) {
     if (action === 'getAssinaturas')    return await handleGetAssinaturas(db, sessao, body);
     if (action === 'cancelarAssinatura') return await handleCancelarAssinatura(db, sessao, body);
 
-    // Ações admin
+    // Ações admin + gestora (visualização de todos os colaboradores)
+    if (action === 'listarTodosPeriodos') {
+      assertAdminOuGestora(sessao);
+      return await handleListarTodosPeriodos(db, body);
+    }
+    if (action === 'listarTodosPontos') {
+      assertAdminOuGestora(sessao);
+      return await handleListarTodosPontos(db, body);
+    }
+    if (action === 'listarFuncionariosAdmin') {
+      assertAdminOuGestora(sessao);
+      return await handleListarFuncionariosAdmin(db);
+    }
+
+    // Ações exclusivas de admin
     assertAdmin(sessao);
     if (action === 'listarFuncionarios')    return await handleListarFuncionarios(db);
     if (action === 'salvarFuncionario')     return await handleSalvarFuncionario(db, sessao, body);
     if (action === 'inativarFuncionario')   return await handleInativarFuncionario(db, sessao, body);
-    if (action === 'listarTodosPontos')     return await handleListarTodosPontos(db, body);
-    if (action === 'listarTodosPeriodos')   return await handleListarTodosPeriodos(db, body);
     if (action === 'resetarSenha')          return await handleResetarSenha(db, sessao, body);
     if (action === 'salvarFeriado')         return await handleSalvarFeriado(db, body);
     if (action === 'excluirFeriado')        return await handleExcluirFeriado(db, body);
     if (action === 'preenchimentoRetroativo') return await handlePreenchimentoRetroativo(db, sessao, body);
-    if (action === 'listarFuncionariosAdmin') return await handleListarFuncionariosAdmin(db);
     if (action === 'excluirRegistroPonto')    return await handleExcluirRegistroPonto(db, sessao, body);
     if (action === 'excluirAssinatura')       return await handleExcluirAssinatura(db, sessao, body);
 
@@ -647,7 +658,7 @@ async function handleSalvarFuncionario(db, sessao, body) {
   const gestor       = String(body.gestor || '').trim().slice(0, 120);
   const unidade      = String(body.unidade || 'Manaus/AM').trim().slice(0, 80);
   const matricula    = String(body.matricula || '').trim().slice(0, 40);
-  const perfil       = ['admin','funcionario'].includes(body.perfil) ? body.perfil : 'funcionario';
+  const perfil       = ['admin','funcionario','gestora'].includes(body.perfil) ? body.perfil : 'funcionario';
   const situacao     = ['ATIVO','INATIVO','AFASTADO','FERIAS'].includes(String(body.situacao||'').toUpperCase())
     ? String(body.situacao).toUpperCase() : 'ATIVO';
   const cargaDiaria  = Number(body.carga_diaria) || 8.5;
@@ -919,6 +930,11 @@ function sanitizarUsuario(u) {
 
 function assertAdmin(sessao) {
   if (sessao.perfil !== 'admin') throw httpError(403, 'Acesso restrito a administradores.');
+}
+
+function assertAdminOuGestora(sessao) {
+  if (sessao.perfil !== 'admin' && sessao.perfil !== 'gestora')
+    throw httpError(403, 'Acesso restrito a administradores ou gestora.');
 }
 
 // ─── Helpers: Rate limit ──────────────────────────────────────────────────────

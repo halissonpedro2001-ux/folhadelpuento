@@ -320,11 +320,10 @@
   <script>
     const { Sessao, api, UI, formatarMesAno, mesAnoAtual } = FP;
     if (!Sessao.isLogado()) window.location.replace('/login.html');
-    // Admin só pode acessar esta página via parâmetro ?usuario_id= (visualizando folha de outro)
-    // Acesso direto sem parâmetro redireciona para o painel de gestão
-    if (Sessao.isAdmin() && !new URLSearchParams(window.location.search).get('usuario_id')) {
-      window.location.replace('/admin.html');
-    }
+    // Admin e gestora só podem acessar esta página via parâmetro ?usuario_id= (visualizando folha de outro)
+    const _uid = new URLSearchParams(window.location.search).get('usuario_id');
+    if (Sessao.isAdmin() && !_uid) window.location.replace('/admin.html');
+    if (Sessao.perfil === 'gestora' && !_uid) window.location.replace('/gestora.html');
 
     // Injetar ícones SVG
     document.getElementById('headerNome').textContent = Sessao.nome || 'Usuário';

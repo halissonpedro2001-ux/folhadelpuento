@@ -172,8 +172,9 @@
     const { Sessao, api, UI, formatarMesAno, mesAnoAtual } = FP;
 
     if (!Sessao.isLogado()) window.location.replace('/login.html');
-    // Admin não lança horas próprias — redirecionar para painel de gestão
+    // Admin e gestora não lançam horas próprias
     if (Sessao.isAdmin()) window.location.replace('/admin.html');
+    if (Sessao.perfil === 'gestora') window.location.replace('/gestora.html');
 
     document.getElementById('headerNome').textContent = Sessao.nome || 'Usuário';
     document.getElementById('btnLogout').innerHTML = icon('logOut') + ' Sair';

@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestão de Ponto — NEW Elevadores</title>
+  <link rel="stylesheet" href="/assets/css/app.css">
+  <script src="/assets/js/icons.js"></script>
+  <style>
+    /* ── Tabela de colaboradores ── */
+    .colab-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    .colab-table th {
+      background: var(--brand); color: rgba(255,255,255,.9);
+      font-size: .75rem; text-transform: uppercase; letter-spacing: .04em;
+      padding: 10px 14px; text-align: left; font-weight: 600;
+    }
+    .colab-table td { padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+    .colab-row { cursor: pointer; transition: background .15s; }
+    .colab-row:hover td { background: #f0f6ff; }
+    .colab-row.expanded td { background: #e8f0fe; font-weight: 600; }
+    .colab-row td:first-child { padding-left: 10px; }
+    .expand-icon { display: inline-flex; align-items: center; margin-right: 8px; transition: transform .2s; color: var(--brand); }
+    .colab-row.expanded .expand-icon { transform: rotate(90deg); }
+
+    /* ── Linha suspensa (folha de ponto inline) ── */
+    .folha-row { display: none; }
+    .folha-row.open { display: table-row; }
+    .folha-row td { padding: 0; border-bottom: 2px solid var(--brand); }
+    .folha-inner {
+      background: #f8faff;
+      border-left: 4px solid var(--brand);
+      padding: 20px 24px;
+      overflow-x: auto;
+    }
+
+    /* ── Cabeçalho da folha inline ── */
+    .folha-header {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 12px; margin-bottom: 16px;
+    }
+    .folha-header h3 { margin: 0; font-size: 1rem; color: var(--brand); }
+    .folha-nav { display: flex; align-items: center; gap: 8px; }
+    .btn-nav-sm {
+      background: none; border: 1px solid #cbd5e1; border-radius: 6px;
+      padding: 4px 8px; cursor: pointer; color: var(--brand);
+      display: flex; align-items: center;
+    }
+    .btn-nav-sm:hover { background: #e8f0fe; }
+    .mes-label-sm { font-weight: 700; font-size: .9rem; min-width: 120px; text-align: center; }
+
+    /* ── Mini-tabela de ponto ── */
+    .ponto-mini { width: 100%; border-collapse: collapse; font-size: .78rem; margin-top: 8px; }
+    .ponto-mini th {
+      background: #1a3a5c; color: #fff;
+      padding: 6px 8px; text-align: center; font-size: .7rem;
+      text-transform: uppercase; letter-spacing: .03em; font-weight: 600;
+    }
+    .ponto-mini td { padding: 5px 8px; border-bottom: 1px solid #e2e8f0; text-align: center; }
+    .ponto-mini tr:nth-child(even) td { background: #f1f5fb; }
+    .ponto-mini tr.fds td { color: #94a3b8; }
+    .ponto-mini tr.feriado td { color: #f59e0b; }
+    .ponto-mini tr.hoje td { background: #fffbeb !important; font-weight: 700; }
+
+    /* ── Resumo do mês inline ── */
+    .resumo-inline {
+      display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;
+    }
+    .resumo-item {
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
+      padding: 8px 14px; font-size: .78rem; min-width: 110px;
+    }
+    .resumo-item .ri-label { color: var(--muted); font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; }
+    .resumo-item .ri-value { font-weight: 700; font-size: .95rem; margin-top: 2px; }
+
+    /* ── Assinaturas inline ── */
+    .assinaturas-inline {
+      display: flex; gap: 24px; flex-wrap: wrap;
+      border-top: 1px solid #e2e8f0; margin-top: 16px; padding-top: 14px;
+    }
+    .ass-box {
+      flex: 1; min-width: 200px; text-align: center;
+      border-top: 2px solid #334155; padding-top: 8px; font-size: .78rem; color: #475569;
+    }
+    .ass-status { font-size: .72rem; margin-top: 4px; }
+    .ass-status.signed { color: #16a34a; font-weight: 600; }
+    .btn-assinar-inline {
+      margin-top: 8px; background: var(--brand); color: #fff;
+      border: none; border-radius: 6px; padding: 5px 14px;
+      font-size: .78rem; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
+    }
+    .btn-assinar-inline:hover { background: #2563a8; }
+
+    /* ── Seletor de mês ── */
+    .mes-selector { display: flex; align-items: center; gap: 8px; }
+    .mes-selector select {
+      border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 10px;
+      font-size: .85rem; background: #fff; cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="loadingPage" class="loading-page">
+    <div class="spinner-lg"></div>
+    <p style="color: var(--muted)">Carregando...</p>
+  </div>
+
+  <div id="appWrap" class="app-wrap hidden">
+    <header class="app-header">
+      <a href="/gestora.html" class="logo">
+        <div class="logo-mark">N</div>
+        <span>Folha de Ponto</span>
+      </a>
+      <nav>
+        <a href="/gestora.html" class="active">Gestão de Ponto</a>
+        <a href="/configurar-2fa.html">Segurança</a>
+      </nav>
+      <div class="header-user">
+        <strong id="headerNome">—</strong>
+        <button class="btn-logout" id="btnLogout"></button>
+      </div>
+    </header>
+
+    <main class="app-main">
+      <div class="flex-center gap-12 mb-24" style="justify-content: space-between; flex-wrap: wrap;">
+        <div>
+          <h1>Gestão de Ponto</h1>
+          <p style="margin-top: 4px; color: var(--muted); font-size: .85rem;">
+            Clique em um colaborador para expandir a folha de ponto
+          </p>
+        </div>
+        <div class="mes-selector">
+          <label for="selectMesGestora" style="font-size:.8rem; font-weight:600; color:var(--muted);">Mês:</label>
+          <select id="selectMesGestora"></select>
+        </div>
+      </div>
+
+      <div id="alertaGestora" class="alert hidden" style="margin-bottom:12px;"></div>
+
+      <div class="card" style="padding: 0; overflow: hidden;">
+        <div style="overflow-x: auto;">
+          <table class="colab-table" id="tabelaGestora">
+            <thead>
+              <tr>
+                <th style="width:32px;"></th>
+                <th>Colaborador</th>
+                <th>Cargo / Setor</th>
+                <th>H. Previstas</th>
+                <th>H. Trabalhadas</th>
+                <th>Saldo do Mês</th>
+                <th>Saldo Acumulado</th>
+                <th>Status</th>
+                <th>Assinaturas</th>
+              </tr>
+            </thead>
+            <tbody id="corpoGestora">
+              <tr><td colspan="9" style="text-align:center; padding: 32px; color: var(--muted);">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/assets/js/app.js"></script>
+  <script>
+    const { Sessao, api, UI, formatarMesAno, gerarOpcoesMeses, mesAnoAtual } = FP;
+
+    if (!Sessao.isLogado()) window.location.replace('/login.html');
+    if (Sessao.perfil !== 'gestora') window.location.replace('/');
+
+    document.getElementById('headerNome').textContent = Sessao.nome || 'Gestora';
+    document.getElementById('btnLogout').innerHTML = icon('logOut') + ' Sair';
+    document.getElementById('btnLogout').onclick = () => Sessao.logout();
+
+    const HOJE = new Date().toISOString().slice(0, 10);
+    let mesAtual = mesAnoAtual();
+    let periodosCache = [];
+    // Controla qual linha está expandida: { usuarioId, mesAno }
+    let expandidoAtual = null;
+
+    // ── Seletor de mês ────────────────────────────────────────────────────────
+    const selectMes = document.getElementById('selectMesGestora');
+    gerarOpcoesMeses(selectMes, mesAtual);
+    selectMes.addEventListener('change', () => {
+      mesAtual = selectMes.value;
+      expandidoAtual = null;
+      carregarColaboradores();
+    });
+
+    // ── Carregar lista de colaboradores ──────────────────────────────────────
+    async function carregarColaboradores() {
+      document.getElementById('corpoGestora').innerHTML =
+        '<tr><td colspan="9" style="text-align:center; padding: 32px; color: var(--muted);">Carregando...</td></tr>';
+      try {
+        const data = await api('listarTodosPeriodos', { mesAno: mesAtual });
+        periodosCache = data.periodos || [];
+        renderColaboradores(periodosCache);
+      } catch (err) {
+        document.getElementById('corpoGestora').innerHTML =
+          `<tr><td colspan="9" style="text-align:center; padding: 24px; color: var(--danger);">${err.message}</td></tr>`;
+      }
+    }
+
+    function renderColaboradores(lista) {
+      const tbody = document.getElementById('corpoGestora');
+      if (!lista.length) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 32px; color: var(--muted);">Nenhum colaborador com registro neste mês.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = lista.map(p => {
+        const statusBadge = p.status === 'fechado'
+          ? '<span class="badge danger">Fechado</span>'
+          : '<span class="badge ok">Aberto</span>';
+
+        // Assinaturas resumidas
+        const assColab = p.ass_colaborador ? `<span class="badge ok" style="font-size:.7rem;">Colab ✓</span>` : `<span class="badge" style="font-size:.7rem; background:#f1f5f9; color:#64748b;">Colab —</span>`;
+        const assGestor = p.ass_gestor ? `<span class="badge ok" style="font-size:.7rem;">Gestor ✓</span>` : `<span class="badge" style="font-size:.7rem; background:#f1f5f9; color:#64748b;">Gestor —</span>`;
+
+        return `
+          <tr class="colab-row" id="row-${p.usuario_id}" data-uid="${p.usuario_id}" data-nome="${escHtml(p.nome || '')}">
+            <td><span class="expand-icon" id="icon-${p.usuario_id}">${icon('arrowRight', {size:14})}</span></td>
+            <td><strong>${escHtml(p.nome || '—')}</strong><br><small style="color:var(--muted)">${escHtml(p.email || '')}</small></td>
+            <td>${escHtml(p.cargo || '—')}<br><small style="color:var(--muted)">${escHtml(p.setor || '')}</small></td>
+            <td>${UI.formatHoras(p.horas_previstas)}</td>
+            <td>${UI.formatHoras(p.horas_trabalhadas)}</td>
+            <td>${UI.formatSaldo(p.saldo_periodo)}</td>
+            <td>${UI.formatSaldo(p.saldo_acumulado)}</td>
+            <td>${statusBadge}</td>
+            <td style="display:flex; gap:4px; flex-wrap:wrap;">${assColab} ${assGestor}</td>
+          </tr>
+          <tr class="folha-row" id="folha-${p.usuario_id}">
+            <td colspan="9">
+              <div class="folha-inner" id="inner-${p.usuario_id}">
+                <div style="text-align:center; padding: 24px; color: var(--muted);">Carregando folha...</div>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      // Eventos de clique para expandir/recolher
+      lista.forEach(p => {
+        document.getElementById(`row-${p.usuario_id}`).addEventListener('click', () => {
+          toggleFolha(p.usuario_id, p.nome);
+        });
+      });
+    }
+
+    // ── Toggle da linha suspensa ──────────────────────────────────────────────
+    function toggleFolha(uid, nome) {
+      const row = document.getElementById(`row-${uid}`);
+      const folhaRow = document.getElementById(`folha-${uid}`);
+      const isOpen = folhaRow.classList.contains('open');
+
+      // Fechar qualquer outra linha aberta
+      document.querySelectorAll('.folha-row.open').forEach(r => r.classList.remove('open'));
+      document.querySelectorAll('.colab-row.expanded').forEach(r => r.classList.remove('expanded'));
+
+      if (!isOpen) {
+        row.classList.add('expanded');
+        folhaRow.classList.add('open');
+        expandidoAtual = { uid, mesAno: mesAtual };
+        carregarFolhaInline(uid, nome, mesAtual);
+      } else {
+        expandidoAtual = null;
+      }
+    }
+
+    // ── Carregar folha de ponto inline ────────────────────────────────────────
+    async function carregarFolhaInline(uid, nome, mesAno) {
+      const inner = document.getElementById(`inner-${uid}`);
+      inner.innerHTML = `<div style="text-align:center; padding: 24px; color: var(--muted);">Carregando folha de ${escHtml(nome)}...</div>`;
+
+      try {
+        const [dadosPonto, dadosAssin] = await Promise.all([
+          api('listarPonto', { usuario_id: uid, mesAno }),
+          api('getAssinaturas', { usuario_id: uid, mesAno })
+        ]);
+
+        const grade = dadosPonto.grade || [];
+        const periodo = dadosPonto.periodo || {};
+        const assinaturas = dadosAssin.assinaturas || [];
+        const assColab  = assinaturas.find(a => a.tipo === 'colaborador');
+        const assGestor = assinaturas.find(a => a.tipo === 'gestor');
+
+        const [ano, mes] = mesAno.split('-');
+        const mesLabel = formatarMesAno(mesAno);
+
+        inner.innerHTML = `
+          <div class="folha-header">
+            <h3>${escHtml(nome)} — ${mesLabel}</h3>
+            <div class="folha-nav">
+              <button class="btn-nav-sm" onclick="navegarFolhaInline('${uid}', '${escHtml(nome)}', '${mesAno}', -1)">${icon('arrowLeft', {size:14})}</button>
+              <span class="mes-label-sm">${mesLabel}</span>
+              <button class="btn-nav-sm" onclick="navegarFolhaInline('${uid}', '${escHtml(nome)}', '${mesAno}', 1)">${icon('arrowRight', {size:14})}</button>
+            </div>
+          </div>
+
+          <!-- Resumo do mês -->
+          <div class="resumo-inline">
+            <div class="resumo-item">
+              <div class="ri-label">H. Previstas</div>
+              <div class="ri-value">${UI.formatHoras(periodo.horas_previstas)}</div>
+            </div>
+            <div class="resumo-item">
+              <div class="ri-label">H. Trabalhadas</div>
+              <div class="ri-value">${UI.formatHoras(periodo.horas_trabalhadas)}</div>
+            </div>
+            <div class="resumo-item">
+              <div class="ri-label">Crédito BH</div>
+              <div class="ri-value" style="color:var(--success)">${UI.formatSaldo(periodo.credito_bh)}</div>
+            </div>
+            <div class="resumo-item">
+              <div class="ri-label">Débito BH</div>
+              <div class="ri-value" style="color:var(--danger)">${UI.formatSaldo(periodo.debito_bh)}</div>
+            </div>
+            <div class="resumo-item">
+              <div class="ri-label">Saldo do Mês</div>
+              <div class="ri-value ${(periodo.saldo_periodo||0) >= 0 ? 'text-success' : 'text-danger'}">${UI.formatSaldo(periodo.saldo_periodo)}</div>
+            </div>
+            <div class="resumo-item">
+              <div class="ri-label">Saldo Acumulado</div>
+              <div class="ri-value ${(periodo.saldo_acumulado||0) >= 0 ? 'text-success' : 'text-danger'}">${UI.formatSaldo(periodo.saldo_acumulado)}</div>
+            </div>
+            <div class="resumo-item">
+              <div class="ri-label">Status</div>
+              <div class="ri-value">${periodo.status === 'fechado' ? '<span class="badge danger">Fechado</span>' : '<span class="badge ok">Aberto</span>'}</div>
+            </div>
+          </div>
+
+          <!-- Tabela de ponto -->
+          <div style="overflow-x:auto;">
+            <table class="ponto-mini">
+              <thead>
+                <tr>
+                  <th>Data</th><th>Dia</th><th>Tipo</th>
+                  <th>Entrada</th><th>Saída Alm.</th><th>Ret. Alm.</th><th>Saída</th>
+                  <th>Intervalo</th><th>H. Trab.</th><th>Ocorrência</th>
+                  <th>H. Prev.</th><th>Crédito</th><th>Débito</th><th>Saldo Dia</th>
+                  <th>Observações</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${grade.map(l => {
+                  const [a, m, d] = l.data.split('-');
+                  const isFds = l.tipo_dia === 'Fim de semana';
+                  const isFer = l.tipo_dia === 'Feriado';
+                  const isHoje = l.data === HOJE;
+                  const cls = isHoje ? 'hoje' : isFds ? 'fds' : isFer ? 'feriado' : '';
+                  return `<tr class="${cls}">
+                    <td>${d}/${m}/${a}</td>
+                    <td>${l.dia_semana || ''}</td>
+                    <td>${UI.badgeTipoDia(l.tipo_dia || 'Dia útil')}</td>
+                    <td>${l.entrada || '—'}</td>
+                    <td>${l.saida_almoco || '—'}</td>
+                    <td>${l.retorno_almoco || '—'}</td>
+                    <td>${l.saida || '—'}</td>
+                    <td>${UI.formatHoras(l.intervalo_horas)}</td>
+                    <td>${UI.formatHoras(l.horas_trabalhadas)}</td>
+                    <td>${l.ocorrencia || '—'}</td>
+                    <td>${UI.formatHoras(l.horas_previstas)}</td>
+                    <td>${UI.formatSaldo(l.credito_bh)}</td>
+                    <td>${UI.formatSaldo(l.debito_bh)}</td>
+                    <td>${UI.formatSaldo(l.saldo_dia)}</td>
+                    <td style="max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escHtml(l.observacoes || '')}">${escHtml(l.observacoes || '—')}</td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Assinaturas -->
+          <div class="assinaturas-inline">
+            <div class="ass-box">
+              ${assColab
+                ? `<div class="ass-status signed">${icon('check', {size:13})} Assinado por ${escHtml(assColab.nome || 'Colaborador')}<br><small>${fmtDataHora(assColab.criado_em)}</small></div>`
+                : `<div class="ass-status" style="color:#94a3b8;">Aguardando assinatura do colaborador</div>`
+              }
+              <div style="margin-top:6px; font-size:.78rem; color:#475569;">Assinatura do Colaborador</div>
+            </div>
+            <div class="ass-box">
+              ${assGestor
+                ? `<div class="ass-status signed">${icon('check', {size:13})} Assinado por ${escHtml(assGestor.nome || 'Gestor')}<br><small>${fmtDataHora(assGestor.criado_em)}</small></div>`
+                : `<div class="ass-status" style="color:#94a3b8;">Aguardando assinatura da gestora</div>`
+              }
+              ${!assGestor
+                ? `<button class="btn-assinar-inline" onclick="assinarComoGestora('${uid}', '${mesAno}', '${escHtml(nome)}')">${icon('pen', {size:13})} Assinar como Gestora</button>`
+                : ''
+              }
+              <div style="margin-top:6px; font-size:.78rem; color:#475569;">Assinatura da Gestora</div>
+            </div>
+          </div>
+        `;
+      } catch (err) {
+        inner.innerHTML = `<div style="padding:16px; color:var(--danger);">Erro ao carregar folha: ${err.message}</div>`;
+      }
+    }
+
+    // ── Navegar mês dentro da linha suspensa ──────────────────────────────────
+    window.navegarFolhaInline = function(uid, nome, mesAno, delta) {
+      const [ano, mes] = mesAno.split('-').map(Number);
+      let novoMes = mes + delta;
+      let novoAno = ano;
+      if (novoMes > 12) { novoMes = 1; novoAno++; }
+      if (novoMes < 1)  { novoMes = 12; novoAno--; }
+      const novoMesAno = `${novoAno}-${String(novoMes).padStart(2,'0')}`;
+      carregarFolhaInline(uid, nome, novoMesAno);
+    };
+
+    // ── Assinar como gestora ──────────────────────────────────────────────────
+    window.assinarComoGestora = async function(uid, mesAno, nome) {
+      const ok = await UI.confirm(`Confirma assinatura da folha de ${nome} (${formatarMesAno(mesAno)}) como gestora?`);
+      if (!ok) return;
+      try {
+        await api('assinarFolha', { tipo: 'gestor', usuario_id: uid, mesAno });
+        carregarFolhaInline(uid, nome, mesAno);
+        carregarColaboradores(); // Atualizar badge de assinatura na tabela
+      } catch (err) {
+        alert('Erro ao assinar: ' + err.message);
+      }
+    };
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    function escHtml(str) {
+      return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function fmtDataHora(iso) {
+      if (!iso) return '';
+      try {
+        const d = new Date(iso);
+        return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+      } catch { return iso; }
+    }
+
+    // ── Inicializar ───────────────────────────────────────────────────────────
+    document.getElementById('loadingPage').classList.add('hidden');
+    document.getElementById('appWrap').classList.remove('hidden');
+    carregarColaboradores();
+  </script>
+</body>
+</html>
