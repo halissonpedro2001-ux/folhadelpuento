@@ -148,8 +148,15 @@ const MIGRATION_SQL = [
     UNIQUE(usuario_id, periodo_id, tipo)
   )`,
 
-  // Coluna data_admissao nos usuários (migration incremental)
+  // Colunas adicionadas em migrações incrementais (ignorar se já existirem)
   `ALTER TABLE fp_usuarios ADD COLUMN data_admissao TEXT`,
+  `ALTER TABLE fp_registros_ponto ADD COLUMN periodo_id TEXT`,
+  `ALTER TABLE fp_registros_ponto ADD COLUMN criado_por TEXT`,
+  `ALTER TABLE fp_registros_ponto ADD COLUMN tipo_dia TEXT`,
+  `ALTER TABLE fp_registros_ponto ADD COLUMN credito_bh REAL DEFAULT 0`,
+  `ALTER TABLE fp_registros_ponto ADD COLUMN debito_bh REAL DEFAULT 0`,
+  `ALTER TABLE fp_registros_ponto ADD COLUMN saldo_dia REAL DEFAULT 0`,
+  `ALTER TABLE fp_registros_ponto ADD COLUMN horas_previstas REAL`,
 
   // Índices
   `CREATE INDEX IF NOT EXISTS idx_fp_ponto_usuario_data ON fp_registros_ponto(usuario_id, data)`,
@@ -280,9 +287,14 @@ async function runMigrations(db) {
   for (const sql of MIGRATION_SQL) {
     try { await db.prepare(sql).run(); }
     catch (e) {
-      // Ignorar erros de "já existe"
-      if (!e.message?.includes('already exists') && !e.message?.includes('UNIQUE')) {
-        console.error('migration_stmt_error', e.message, sql.slice(0, 80));
+      const msg = e.message || '';
+      // Ignorar erros esperados: coluna já existe, tabela já existe, constraint duplicada
+      const ignorar = msg.includes('already exists') ||
+                      msg.includes('duplicate column') ||
+                      msg.includes('UNIQUE') ||
+                      msg.includes('no such table: fp_') === false && msg.includes('no such table');
+      if (!ignorar) {
+        console.error('migration_stmt_error', msg, sql.slice(0, 80));
       }
     }
   }
