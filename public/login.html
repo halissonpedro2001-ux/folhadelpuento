@@ -5,69 +5,265 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login — Folha de Ponto NEW Elevadores</title>
   <link rel="stylesheet" href="/assets/css/app.css">
+  <style>
+    .login-wrap {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #0d2137 0%, #1a3a5c 60%, #2563a8 100%);
+      padding: 24px;
+    }
+    .login-card {
+      background: #fff;
+      border-radius: 14px;
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 16px 48px rgba(0,0,0,.25);
+    }
+    .login-brand { text-align: center; margin-bottom: 28px; }
+    .login-logo {
+      width: 60px; height: 60px;
+      background: #1a3a5c; border-radius: 12px;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 1.8rem; font-weight: 900; color: #fff; margin-bottom: 12px;
+    }
+    .login-brand h1 { font-size: 1.1rem; font-weight: 700; color: #0d2137; margin-bottom: 2px; }
+    .login-brand p  { font-size: .78rem; color: #64748b; }
+    .login-tabs {
+      display: flex; border-bottom: 2px solid #e2e8f0; margin-bottom: 24px;
+    }
+    .login-tab {
+      flex: 1; padding: 8px; background: none; border: none;
+      border-bottom: 2px solid transparent; margin-bottom: -2px;
+      font-size: .85rem; font-weight: 600; color: #64748b; cursor: pointer;
+      transition: color .15s, border-color .15s;
+    }
+    .login-tab.active { color: #1a3a5c; border-bottom-color: #1a3a5c; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .aviso-tentativas {
+      background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px;
+      padding: 8px 12px; font-size: .78rem; color: #92400e; margin-bottom: 14px;
+    }
+    .aviso-bloqueio {
+      background: #fee2e2; border: 1px solid #fca5a5; border-radius: 6px;
+      padding: 10px 14px; font-size: .82rem; color: #b91c1c;
+      margin-bottom: 14px; text-align: center;
+    }
+    .token-box {
+      background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px;
+      padding: 12px; font-size: .78rem; color: #0369a1; margin-top: 12px;
+      word-break: break-all;
+    }
+    .token-box strong { display: block; margin-bottom: 4px; color: #0d2137; }
+    .input-group { margin-bottom: 16px; }
+    .input-group label { display: block; font-size: .82rem; font-weight: 600; color: #374151; margin-bottom: 5px; }
+    .input-group input {
+      width: 100%; border: 1px solid #cbd5e1; border-radius: 7px;
+      padding: 10px 12px; font-size: .9rem; transition: border-color .15s;
+    }
+    .input-group input:focus { outline: none; border-color: #2563a8; box-shadow: 0 0 0 3px rgba(37,99,168,.12); }
+    .btn-login {
+      width: 100%; background: #1a3a5c; color: #fff; border: none;
+      border-radius: 7px; padding: 11px; font-size: .92rem; font-weight: 700;
+      cursor: pointer; transition: background .15s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn-login:hover:not(:disabled) { background: #2563a8; }
+    .btn-login:disabled { background: #94a3b8; cursor: not-allowed; }
+    .alert-box { border-radius: 6px; padding: 9px 12px; font-size: .82rem; margin-bottom: 14px; }
+    .alert-error   { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+    .alert-success { background: #e6f4ed; color: #1a7a4a; border: 1px solid #86efac; }
+    .btn-link {
+      background: none; border: none; color: #2563a8; font-size: inherit;
+      cursor: pointer; text-decoration: underline; padding: 0;
+    }
+    .btn-link:hover { color: #1a3a5c; }
+    .spinner-sm {
+      width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.3);
+      border-top-color: #fff; border-radius: 50%;
+      animation: spin .6s linear infinite; display: inline-block;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .hidden { display: none !important; }
+  </style>
 </head>
 <body>
-  <div class="login-page">
-    <div class="login-box">
-      <div class="login-logo">
-        <div class="mark">N</div>
-        <div>
-          <div class="title">NEW Elevadores</div>
-          <div class="subtitle">Sistema de Folha de Ponto</div>
-        </div>
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-brand">
+        <div class="login-logo">N</div>
+        <h1>NEW Elevadores</h1>
+        <p>Sistema de Controle de Ponto e Banco de Horas</p>
       </div>
 
-      <h2>Entrar na sua conta</h2>
-      <p>Digite seu email e senha para acessar o sistema.</p>
+      <div class="login-tabs">
+        <button class="login-tab active" id="tabLogin" onclick="mostrarAba('login')">Entrar</button>
+        <button class="login-tab" id="tabRecup" onclick="mostrarAba('recup')">Recuperar Senha</button>
+      </div>
 
-      <div id="alerta" class="alert alert-error hidden"></div>
-
-      <form id="formLogin" autocomplete="on">
-        <div class="field mb-16">
-          <label for="email">Email corporativo</label>
-          <input type="email" id="email" name="email" placeholder="seu@email.com"
-                 autocomplete="email" required autofocus>
+      <!-- Aba Login -->
+      <div id="panelLogin" class="tab-panel active">
+        <div id="alertLogin" class="alert-box hidden"></div>
+        <div id="avisoBloqueio" class="aviso-bloqueio hidden">
+          🔒 Acesso temporariamente bloqueado.<br>
+          Aguarde alguns minutos ou <button class="btn-link" onclick="mostrarAba('recup')">recupere sua senha</button>.
+        </div>
+        <div id="avisoTentativas" class="aviso-tentativas hidden">
+          ⚠️ <span id="txtTentativas"></span>
         </div>
 
-        <div class="field mb-24">
-          <label for="senha">Senha</label>
-          <input type="password" id="senha" name="password" placeholder="••••••••"
-                 autocomplete="current-password" required>
+        <form id="formLogin" autocomplete="on">
+          <div class="input-group">
+            <label for="loginEmail">Email corporativo</label>
+            <input type="email" id="loginEmail" name="email"
+              maxlength="120" placeholder="seu@email.com"
+              autocomplete="email" required autofocus>
+          </div>
+          <div class="input-group">
+            <label for="loginSenha">Senha</label>
+            <input type="password" id="loginSenha" name="password"
+              maxlength="128" placeholder="••••••••"
+              autocomplete="current-password" required>
+          </div>
+          <button type="submit" class="btn-login" id="btnLogin">
+            <span id="btnLoginText">Entrar</span>
+            <span id="btnLoginSpinner" class="spinner-sm hidden"></span>
+          </button>
+        </form>
+
+        <p style="text-align:center; margin-top:14px; font-size:.78rem; color:#64748b;">
+          Esqueceu a senha?
+          <button class="btn-link" onclick="mostrarAba('recup')">Clique aqui</button>
+        </p>
+      </div>
+
+      <!-- Aba Recuperação -->
+      <div id="panelRecup" class="tab-panel">
+        <div id="alertRecup" class="alert-box hidden"></div>
+
+        <div id="recupPasso1">
+          <p style="font-size:.82rem; color:#374151; margin-bottom:16px; line-height:1.5;">
+            Informe seu email. Um token de recuperação será gerado — apresente-o ao administrador para redefinir sua senha.
+          </p>
+          <form id="formRecupEmail" autocomplete="off">
+            <div class="input-group">
+              <label for="recupEmail">Email cadastrado</label>
+              <input type="email" id="recupEmail" maxlength="120" placeholder="seu@email.com" required>
+            </div>
+            <button type="submit" class="btn-login" id="btnSolicitarToken">
+              <span id="btnSolicitarText">Gerar Token de Recuperação</span>
+              <span id="btnSolicitarSpinner" class="spinner-sm hidden"></span>
+            </button>
+          </form>
+          <div id="tokenGerado" class="token-box hidden">
+            <strong>Token gerado!</strong>
+            Apresente este token ao administrador:<br><br>
+            <code id="tokenValor" style="font-size:.85rem; background:#e0f2fe; padding:4px 8px; border-radius:4px; display:block;"></code>
+            <br>
+            <button class="btn-link" onclick="copiarToken()">📋 Copiar token</button>
+            <span style="font-size:.72rem; color:#64748b; display:block; margin-top:6px;" id="tokenExpira"></span>
+          </div>
         </div>
 
-        <button type="submit" class="btn btn-primary btn-full" id="btnLogin">
-          Entrar
-        </button>
-      </form>
-
-      <p class="text-center text-muted text-small mt-16">
-        Problemas de acesso? Fale com o administrador do sistema.
-      </p>
+        <div style="margin-top:20px; border-top:1px solid #e2e8f0; padding-top:16px;">
+          <p style="font-size:.82rem; color:#374151; margin-bottom:12px; font-weight:600;">
+            Já tem um token? Redefina sua senha:
+          </p>
+          <form id="formRedefinir" autocomplete="off">
+            <div class="input-group">
+              <label for="redefinirToken">Token de recuperação</label>
+              <input type="text" id="redefinirToken" maxlength="200" placeholder="Cole o token aqui" required>
+            </div>
+            <div class="input-group">
+              <label for="redefinirSenha">Nova senha (mín. 8 caracteres)</label>
+              <input type="password" id="redefinirSenha" maxlength="128" placeholder="Nova senha" required>
+            </div>
+            <div class="input-group">
+              <label for="redefinirConfirma">Confirmar nova senha</label>
+              <input type="password" id="redefinirConfirma" maxlength="128" placeholder="Confirme a senha" required>
+            </div>
+            <button type="submit" class="btn-login" id="btnRedefinir">
+              <span id="btnRedefinirText">Redefinir Senha</span>
+              <span id="btnRedefinirSpinner" class="spinner-sm hidden"></span>
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
   </div>
 
   <script>
-    // Redirecionar se já estiver logado
-    const token = sessionStorage.getItem('fp_token');
-    if (token) window.location.replace('/');
+    const MAX_TENTATIVAS = 5;
+    let tentativasLocais = parseInt(sessionStorage.getItem('fp_tentativas') || '0');
+    let bloqueadoAteStr = sessionStorage.getItem('fp_bloqueado_ate');
+    let bloqueadoAte = bloqueadoAteStr ? new Date(bloqueadoAteStr) : null;
 
-    const form = document.getElementById('formLogin');
-    const btn  = document.getElementById('btnLogin');
-    const alerta = document.getElementById('alerta');
+    if (sessionStorage.getItem('fp_token')) window.location.replace('/');
 
-    function showAlert(msg, tipo = 'error') {
-      alerta.textContent = msg;
-      alerta.className = `alert alert-${tipo}`;
+    function mostrarAba(aba) {
+      ['login','recup'].forEach(a => {
+        document.getElementById('panel' + a.charAt(0).toUpperCase() + a.slice(1))
+          .classList.toggle('active', a === aba);
+        document.getElementById('tab' + a.charAt(0).toUpperCase() + a.slice(1))
+          .classList.toggle('active', a === aba);
+      });
+      document.getElementById('alertLogin').classList.add('hidden');
+      document.getElementById('alertRecup').classList.add('hidden');
     }
 
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> Entrando...';
-      alerta.className = 'alert hidden';
+    function mostrarAlerta(id, msg, tipo = 'error') {
+      const el = document.getElementById(id);
+      el.textContent = msg;
+      el.className = 'alert-box alert-' + tipo;
+    }
 
-      const email = document.getElementById('email').value.trim();
-      const senha = document.getElementById('senha').value;
+    function atualizarAvisoTentativas() {
+      const agora = new Date();
+      if (bloqueadoAte && agora < bloqueadoAte) {
+        document.getElementById('avisoBloqueio').classList.remove('hidden');
+        document.getElementById('avisoTentativas').classList.add('hidden');
+        document.getElementById('btnLogin').disabled = true;
+        return;
+      }
+      if (bloqueadoAte && agora >= bloqueadoAte) {
+        bloqueadoAte = null;
+        tentativasLocais = 0;
+        sessionStorage.removeItem('fp_bloqueado_ate');
+        sessionStorage.setItem('fp_tentativas', '0');
+      }
+      document.getElementById('avisoBloqueio').classList.add('hidden');
+      document.getElementById('btnLogin').disabled = false;
+      const restantes = MAX_TENTATIVAS - tentativasLocais;
+      if (tentativasLocais >= 2 && tentativasLocais < MAX_TENTATIVAS) {
+        document.getElementById('avisoTentativas').classList.remove('hidden');
+        document.getElementById('txtTentativas').textContent =
+          `Atenção: ${restantes} tentativa${restantes !== 1 ? 's' : ''} restante${restantes !== 1 ? 's' : ''} antes do bloqueio temporário.`;
+      } else {
+        document.getElementById('avisoTentativas').classList.add('hidden');
+      }
+    }
+
+    atualizarAvisoTentativas();
+
+    // ── Login ──
+    document.getElementById('formLogin').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      if (bloqueadoAte && new Date() < bloqueadoAte) {
+        mostrarAlerta('alertLogin', 'Acesso bloqueado. Aguarde ou recupere sua senha.');
+        return;
+      }
+      const email = document.getElementById('loginEmail').value.trim().slice(0, 120);
+      const senha = document.getElementById('loginSenha').value.slice(0, 128);
+      if (!email || !senha) { mostrarAlerta('alertLogin', 'Preencha email e senha.'); return; }
+
+      const btn = document.getElementById('btnLogin');
+      btn.disabled = true;
+      document.getElementById('btnLoginText').textContent = 'Entrando...';
+      document.getElementById('btnLoginSpinner').classList.remove('hidden');
+      document.getElementById('alertLogin').classList.add('hidden');
 
       try {
         const res = await fetch('/api/ponto', {
@@ -77,30 +273,120 @@
         });
         const data = await res.json();
 
-        if (!data.sucesso) {
-          showAlert(data.erro || 'Erro ao fazer login.');
+        if (res.status === 429) {
+          bloqueadoAte = new Date(Date.now() + 15 * 60 * 1000);
+          sessionStorage.setItem('fp_bloqueado_ate', bloqueadoAte.toISOString());
+          tentativasLocais = MAX_TENTATIVAS;
+          sessionStorage.setItem('fp_tentativas', String(tentativasLocais));
+          atualizarAvisoTentativas();
+          mostrarAlerta('alertLogin', data.erro || 'Muitas tentativas. Aguarde 15 minutos.');
           return;
         }
 
-        if (data.requer2fa) {
-          // Guardar token temporário e redirecionar para 2FA
-          sessionStorage.setItem('fp_token_temp', data.tokenTemp);
+        if (!data.sucesso) {
+          tentativasLocais++;
+          sessionStorage.setItem('fp_tentativas', String(tentativasLocais));
+          atualizarAvisoTentativas();
+          mostrarAlerta('alertLogin', data.erro || 'Email ou senha incorretos.');
+          return;
+        }
+
+        tentativasLocais = 0;
+        sessionStorage.setItem('fp_tentativas', '0');
+        sessionStorage.removeItem('fp_bloqueado_ate');
+
+        if (data.requer_2fa || data.requer2fa) {
+          sessionStorage.setItem('fp_token_2fa', data.token_2fa || data.tokenTemp || '');
           sessionStorage.setItem('fp_nome_temp', data.nome || '');
           window.location.replace('/verificar-2fa.html');
           return;
         }
 
-        // Login completo
-        sessionStorage.setItem('fp_token', data.token);
+        sessionStorage.setItem('fp_token',  data.token);
         sessionStorage.setItem('fp_perfil', data.perfil);
-        sessionStorage.setItem('fp_nome', data.nome || '');
+        sessionStorage.setItem('fp_nome',   data.nome || '');
         window.location.replace('/');
 
-      } catch (err) {
-        showAlert('Erro de conexão. Verifique sua internet.');
+      } catch {
+        mostrarAlerta('alertLogin', 'Erro de conexão. Verifique sua internet.');
       } finally {
         btn.disabled = false;
-        btn.textContent = 'Entrar';
+        document.getElementById('btnLoginText').textContent = 'Entrar';
+        document.getElementById('btnLoginSpinner').classList.add('hidden');
+        atualizarAvisoTentativas();
+      }
+    });
+
+    // ── Solicitar token ──
+    document.getElementById('formRecupEmail').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const email = document.getElementById('recupEmail').value.trim().slice(0, 120);
+      if (!email) return;
+      const btn = document.getElementById('btnSolicitarToken');
+      btn.disabled = true;
+      document.getElementById('btnSolicitarText').textContent = 'Gerando...';
+      document.getElementById('btnSolicitarSpinner').classList.remove('hidden');
+      document.getElementById('alertRecup').classList.add('hidden');
+      document.getElementById('tokenGerado').classList.add('hidden');
+      try {
+        const res = await fetch('/api/ponto', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'solicitarRecupSenha', email })
+        });
+        const data = await res.json();
+        if (data.token_recuperacao) {
+          document.getElementById('tokenValor').textContent = data.token_recuperacao;
+          const expira = new Date(data.expira_em);
+          document.getElementById('tokenExpira').textContent =
+            `Válido até: ${expira.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} de ${expira.toLocaleDateString('pt-BR')}`;
+          document.getElementById('tokenGerado').classList.remove('hidden');
+        } else {
+          mostrarAlerta('alertRecup', data.mensagem || 'Solicitação processada.', 'success');
+        }
+      } catch { mostrarAlerta('alertRecup', 'Erro de conexão.'); }
+      finally {
+        btn.disabled = false;
+        document.getElementById('btnSolicitarText').textContent = 'Gerar Token de Recuperação';
+        document.getElementById('btnSolicitarSpinner').classList.add('hidden');
+      }
+    });
+
+    function copiarToken() {
+      const t = document.getElementById('tokenValor').textContent;
+      navigator.clipboard.writeText(t).then(() => alert('Token copiado!')).catch(() => {});
+    }
+
+    // ── Redefinir senha ──
+    document.getElementById('formRedefinir').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const token      = document.getElementById('redefinirToken').value.trim().slice(0, 200);
+      const novaSenha  = document.getElementById('redefinirSenha').value.slice(0, 128);
+      const confirma   = document.getElementById('redefinirConfirma').value.slice(0, 128);
+      if (!token || !novaSenha || !confirma) { mostrarAlerta('alertRecup', 'Preencha todos os campos.'); return; }
+      if (novaSenha.length < 8) { mostrarAlerta('alertRecup', 'A senha deve ter pelo menos 8 caracteres.'); return; }
+      if (novaSenha !== confirma) { mostrarAlerta('alertRecup', 'As senhas não coincidem.'); return; }
+      const btn = document.getElementById('btnRedefinir');
+      btn.disabled = true;
+      document.getElementById('btnRedefinirText').textContent = 'Redefinindo...';
+      document.getElementById('btnRedefinirSpinner').classList.remove('hidden');
+      try {
+        const res = await fetch('/api/ponto', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'redefinirSenha', token, nova_senha: novaSenha })
+        });
+        const data = await res.json();
+        if (data.sucesso) {
+          mostrarAlerta('alertRecup', '✅ ' + data.mensagem + ' Redirecionando...', 'success');
+          document.getElementById('formRedefinir').reset();
+          setTimeout(() => mostrarAba('login'), 2500);
+        } else {
+          mostrarAlerta('alertRecup', data.erro || 'Erro ao redefinir senha.');
+        }
+      } catch { mostrarAlerta('alertRecup', 'Erro de conexão.'); }
+      finally {
+        btn.disabled = false;
+        document.getElementById('btnRedefinirText').textContent = 'Redefinir Senha';
+        document.getElementById('btnRedefinirSpinner').classList.add('hidden');
       }
     });
   </script>

@@ -124,10 +124,35 @@ const MIGRATION_SQL = [
     UNIQUE(usuario_id, data)
   )`,
 
+  // Tabela de tokens de recuperação de senha
+  `CREATE TABLE IF NOT EXISTS fp_recuperacao_senha (
+    token       TEXT PRIMARY KEY,
+    usuario_id  TEXT NOT NULL,
+    email       TEXT NOT NULL,
+    usado       INTEGER DEFAULT 0,
+    criado_em   TEXT NOT NULL,
+    expira_em   TEXT NOT NULL
+  )`,
+
+  // Tabela de assinaturas de folha
+  `CREATE TABLE IF NOT EXISTS fp_assinaturas (
+    id          TEXT PRIMARY KEY,
+    usuario_id  TEXT NOT NULL,
+    periodo_id  TEXT NOT NULL,
+    tipo        TEXT NOT NULL,
+    assinado_em TEXT NOT NULL,
+    ip          TEXT,
+    UNIQUE(usuario_id, periodo_id, tipo)
+  )`,
+
+  // Coluna data_admissao nos usuários (migration incremental)
+  `ALTER TABLE fp_usuarios ADD COLUMN data_admissao TEXT`,
+
   // Índices
   `CREATE INDEX IF NOT EXISTS idx_fp_ponto_usuario_data ON fp_registros_ponto(usuario_id, data)`,
   `CREATE INDEX IF NOT EXISTS idx_fp_periodos_usuario   ON fp_periodos(usuario_id, ano DESC, mes DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_fp_sessoes_expira     ON fp_sessoes(expira_em)`,
+  `CREATE INDEX IF NOT EXISTS idx_fp_recuperacao        ON fp_recuperacao_senha(email, expira_em)`,
 
   // Feriados nacionais 2025
   `INSERT OR IGNORE INTO fp_feriados (id,data,descricao,tipo) VALUES
@@ -199,8 +224,10 @@ export async function onRequest(context) {
     // Ações públicas
     if (action === 'login')        return await handleLogin(db, body, request);
     if (action === 'verificar2fa') return await handleVerificar2fa(db, body, request);
-    if (action === 'logout')       return await handleLogout(db, body);
-    if (action === 'setupAdmin')   return await handleSetupAdmin(db, body, env);
+    if (action === 'logout')          return await handleLogout(db, body);
+    if (action === 'setupAdmin')       return await handleSetupAdmin(db, body, env);
+    if (action === 'solicitarRecupSenha') return await handleSolicitarRecupSenha(db, body);
+    if (action === 'redefinirSenha')   return await handleRedefinirSenha(db, body);
 
     // Ações autenticadas
     const sessao = await validarSessao(db, body.token);
@@ -217,6 +244,8 @@ export async function onRequest(context) {
     if (action === 'listarFeriados')    return await handleListarFeriados(db);
     if (action === 'fecharPeriodo')     return await handleFecharPeriodo(db, sessao, body);
     if (action === 'reabrirPeriodo')    return await handleReabrirPeriodo(db, sessao, body);
+    if (action === 'assinarFolha')      return await handleAssinarFolha(db, sessao, body);
+    if (action === 'getAssinaturas')    return await handleGetAssinaturas(db, sessao, body);
 
     // Ações admin
     assertAdmin(sessao);
@@ -228,6 +257,8 @@ export async function onRequest(context) {
     if (action === 'resetarSenha')          return await handleResetarSenha(db, sessao, body);
     if (action === 'salvarFeriado')         return await handleSalvarFeriado(db, body);
     if (action === 'excluirFeriado')        return await handleExcluirFeriado(db, body);
+    if (action === 'preenchimentoRetroativo') return await handlePreenchimentoRetroativo(db, sessao, body);
+    if (action === 'listarFuncionariosAdmin') return await handleListarFuncionariosAdmin(db);
 
     return jsonError('Ação não encontrada.', 404);
   } catch (err) {
@@ -1168,6 +1199,140 @@ function gerarSenhaTemp() {
   crypto.getRandomValues(arr);
   for (const b of arr) s += chars[b % chars.length];
   return s;
+}
+
+// ─── Recuperação de Senha ─────────────────────────────────────────────────────
+async function handleSolicitarRecupSenha(db, body) {
+  const email = normalizeEmail(body.email);
+  if (!email) throw httpError(400, 'Email é obrigatório.');
+  const usuario = await buscarUsuarioPorEmail(db, email);
+  if (!usuario || usuario.situacao !== 'ATIVO') {
+    return json({ sucesso: true, mensagem: 'Se o email existir, o administrador poderá gerar um token de recuperação.' });
+  }
+  await db.prepare("UPDATE fp_recuperacao_senha SET usado=1 WHERE email=? AND usado=0").bind(email).run();
+  const token = await gerarToken();
+  const expira = new Date(Date.now() + 2 * 3600 * 1000).toISOString();
+  await db.prepare(
+    'INSERT INTO fp_recuperacao_senha (token,usuario_id,email,usado,criado_em,expira_em) VALUES (?,?,?,0,?,?)'
+  ).bind(token, usuario.id, email, nowIso(), expira).run();
+  return json({
+    sucesso: true,
+    mensagem: 'Token gerado. Apresente ao administrador para redefinir sua senha.',
+    token_recuperacao: token,
+    expira_em: expira
+  });
+}
+
+async function handleRedefinirSenha(db, body) {
+  const token = String(body.token || '').trim().slice(0, 200);
+  const novaSenha = String(body.nova_senha || '').slice(0, 128);
+  if (!token || !novaSenha) throw httpError(400, 'Token e nova senha são obrigatórios.');
+  if (novaSenha.length < 8) throw httpError(400, 'A senha deve ter pelo menos 8 caracteres.');
+  const rec = await db.prepare('SELECT * FROM fp_recuperacao_senha WHERE token=? AND usado=0').bind(token).first();
+  if (!rec) throw httpError(400, 'Token inválido ou já utilizado.');
+  if (new Date(rec.expira_em) < new Date()) throw httpError(400, 'Token expirado. Solicite um novo.');
+  const hash = await hashSenha(novaSenha);
+  await db.prepare('UPDATE fp_usuarios SET senha_hash=?,totp_ativo=0,totp_secret=NULL,atualizado_em=? WHERE id=?')
+    .bind(hash, nowIso(), rec.usuario_id).run();
+  await db.prepare('UPDATE fp_recuperacao_senha SET usado=1 WHERE token=?').bind(token).run();
+  return json({ sucesso: true, mensagem: 'Senha redefinida com sucesso. Faça login.' });
+}
+
+// ─── Assinaturas de Folha ─────────────────────────────────────────────────────
+async function handleAssinarFolha(db, sessao, body) {
+  const mesAno = String(body.mesAno || '');
+  const tipo = String(body.tipo || 'colaborador');
+  if (!mesAno) throw httpError(400, 'mesAno é obrigatório.');
+  if (!['colaborador','gestor'].includes(tipo)) throw httpError(400, 'Tipo inválido.');
+  const [ano, mes] = parseMesAno(mesAno);
+  let usuarioId = sessao.usuario_id;
+  if (tipo === 'gestor' && sessao.perfil === 'admin' && body.usuario_id) {
+    usuarioId = String(body.usuario_id);
+  }
+  const periodo = await db.prepare(
+    'SELECT * FROM fp_periodos WHERE usuario_id=? AND ano=? AND mes=?'
+  ).bind(usuarioId, ano, mes).first();
+  if (!periodo) throw httpError(404, 'Período não encontrado. Registre ao menos um ponto primeiro.');
+  const id = gerarId();
+  await db.prepare(`
+    INSERT INTO fp_assinaturas (id,usuario_id,periodo_id,tipo,assinado_em,ip)
+    VALUES (?,?,?,?,?,?)
+    ON CONFLICT(usuario_id,periodo_id,tipo) DO UPDATE SET assinado_em=excluded.assinado_em
+  `).bind(id, usuarioId, periodo.id, tipo, nowIso(), '').run();
+  return json({ sucesso: true, mensagem: `Folha assinada como ${tipo}.`, assinado_em: nowIso() });
+}
+
+async function handleGetAssinaturas(db, sessao, body) {
+  const mesAno = String(body.mesAno || '');
+  if (!mesAno) throw httpError(400, 'mesAno é obrigatório.');
+  const [ano, mes] = parseMesAno(mesAno);
+  let usuarioId = sessao.usuario_id;
+  if (sessao.perfil === 'admin' && body.usuario_id) usuarioId = String(body.usuario_id);
+  const periodo = await db.prepare(
+    'SELECT * FROM fp_periodos WHERE usuario_id=? AND ano=? AND mes=?'
+  ).bind(usuarioId, ano, mes).first();
+  if (!periodo) return json({ sucesso: true, assinaturas: [] });
+  const rows = await db.prepare(
+    'SELECT tipo,assinado_em FROM fp_assinaturas WHERE periodo_id=?'
+  ).bind(periodo.id).all();
+  return json({ sucesso: true, assinaturas: rows.results || [] });
+}
+
+// ─── Admin: Preenchimento Retroativo ───────────────────────────────────────────────
+async function handlePreenchimentoRetroativo(db, sessao, body) {
+  assertAdmin(sessao);
+  const usuarioId = String(body.usuario_id || '').trim();
+  const dataAdmissao = String(body.data_admissao || '').trim();
+  if (!usuarioId) throw httpError(400, 'usuario_id é obrigatório.');
+  if (!dataAdmissao || !/^\d{4}-\d{2}-\d{2}$/.test(dataAdmissao)) {
+    throw httpError(400, 'data_admissao inválida. Use YYYY-MM-DD.');
+  }
+  const usuario = await buscarUsuarioPorId(db, usuarioId);
+  if (!usuario) throw httpError(404, 'Funcionário não encontrado.');
+  await db.prepare('UPDATE fp_usuarios SET data_admissao=?,atualizado_em=? WHERE id=?')
+    .bind(dataAdmissao, nowIso(), usuarioId).run();
+  const hoje = new Date();
+  const anoFim = hoje.getFullYear();
+  const mesFim = hoje.getMonth() + 1;
+  const admData = new Date(dataAdmissao + 'T00:00:00');
+  let anoIni = admData.getFullYear();
+  let mesIni = admData.getMonth() + 1;
+  const periodosGerados = [];
+  let saldoAnterior = 0;
+  while (anoIni < anoFim || (anoIni === anoFim && mesIni <= mesFim)) {
+    const existente = await db.prepare(
+      'SELECT id,saldo_acumulado FROM fp_periodos WHERE usuario_id=? AND ano=? AND mes=?'
+    ).bind(usuarioId, anoIni, mesIni).first();
+    if (!existente) {
+      const id = gerarId();
+      const agora = nowIso();
+      await db.prepare(`
+        INSERT INTO fp_periodos
+          (id,usuario_id,ano,mes,status,saldo_anterior,saldo_acumulado,criado_em,atualizado_em)
+        VALUES (?,?,?,?,'aberto',?,?,?,?)
+      `).bind(id, usuarioId, anoIni, mesIni, saldoAnterior, saldoAnterior, agora, agora).run();
+      periodosGerados.push(`${String(mesIni).padStart(2,'0')}/${anoIni}`);
+    } else {
+      saldoAnterior = existente.saldo_acumulado || 0;
+    }
+    mesIni++;
+    if (mesIni > 12) { mesIni = 1; anoIni++; }
+  }
+  return json({
+    sucesso: true,
+    mensagem: `${periodosGerados.length} período(s) criado(s) para ${usuario.nome} desde ${dataAdmissao}.`,
+    periodos_gerados: periodosGerados,
+    total: periodosGerados.length
+  });
+}
+
+async function handleListarFuncionariosAdmin(db) {
+  const rows = await db.prepare(`
+    SELECT id,nome,email,cargo,setor,gestor,unidade,matricula,perfil,situacao,
+           totp_ativo,carga_diaria,jornada_padrao,data_admissao,criado_em
+    FROM fp_usuarios WHERE deletado_em IS NULL ORDER BY nome
+  `).all();
+  return json({ sucesso: true, funcionarios: rows.results || [] });
 }
 
 // ─── Helpers: Utilitários ─────────────────────────────────────────────────────

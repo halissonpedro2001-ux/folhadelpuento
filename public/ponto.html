@@ -6,23 +6,413 @@
   <title>Folha de Ponto — NEW Elevadores</title>
   <link rel="stylesheet" href="/assets/css/app.css">
   <style>
-    .ponto-table td input[type="time"] { width: 88px; }
-    .ponto-table td.col-data { min-width: 90px; }
-    .ponto-table td.col-dia  { min-width: 40px; font-weight: 500; color: var(--muted); }
-    .ponto-table td.col-tipo { min-width: 110px; }
-    .ponto-table td.col-hora { min-width: 92px; }
-    .ponto-table td.col-oc   { min-width: 120px; }
-    .ponto-table td.col-ht   { min-width: 72px; font-weight: 600; }
-    .ponto-table td.col-bh   { min-width: 72px; }
-    .ponto-table td.col-obs  { min-width: 110px; }
-    .ponto-table td.col-save { min-width: 60px; }
-    .save-indicator { font-size: .75rem; color: var(--ok); font-weight: 600; }
-    .save-indicator.error { color: var(--danger); }
-    .row-saving { opacity: .6; pointer-events: none; }
-    .periodo-fechado-aviso {
-      background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px;
-      padding: 10px 16px; margin-bottom: 16px; font-size: .9rem;
-      display: flex; align-items: center; gap: 8px;
+    /* ── Folha de Ponto: layout fiel à planilha ── */
+    .fp-wrap {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+    }
+
+    /* Cabeçalho institucional */
+    .fp-header-inst {
+      background: #1a3a5c;
+      color: #fff;
+      text-align: center;
+      padding: 10px 16px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      border-radius: 4px 4px 0 0;
+      margin-bottom: 0;
+    }
+
+    .fp-header-empresa {
+      border: 1px solid #b0c4d8;
+      border-top: none;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: #fff;
+    }
+
+    .fp-logo-box {
+      width: 80px;
+      min-width: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .fp-logo-box .logo-mark {
+      width: 54px;
+      height: 54px;
+      background: #1a3a5c;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 1.5rem;
+      font-weight: 900;
+    }
+
+    .fp-empresa-info {
+      flex: 1;
+    }
+
+    .fp-empresa-info strong {
+      display: block;
+      font-size: .95rem;
+      font-weight: 700;
+      color: #0d2137;
+    }
+
+    .fp-empresa-info span {
+      font-size: .78rem;
+      color: #64748b;
+    }
+
+    /* Grade de campos do colaborador */
+    .fp-campos-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      border: 1px solid #b0c4d8;
+      border-top: none;
+      background: #fff;
+    }
+
+    .fp-campo {
+      border-right: 1px solid #b0c4d8;
+      border-bottom: 1px solid #b0c4d8;
+      padding: 4px 8px;
+      font-size: .78rem;
+    }
+
+    .fp-campo:last-child { border-right: none; }
+    .fp-campo .label { color: #64748b; font-size: .72rem; font-weight: 600; display: block; }
+    .fp-campo .valor { color: #0d2137; font-weight: 600; font-size: .82rem; }
+
+    /* Resumo do mês */
+    .fp-resumo-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border: 1px solid #b0c4d8;
+      border-top: none;
+      background: #fff;
+      margin-bottom: 12px;
+    }
+
+    .fp-resumo-left {
+      padding: 8px 12px;
+      border-right: 1px solid #b0c4d8;
+    }
+
+    .fp-resumo-right {
+      padding: 8px 12px;
+    }
+
+    .fp-resumo-title {
+      background: #1a3a5c;
+      color: #fff;
+      font-size: .75rem;
+      font-weight: 700;
+      text-align: center;
+      padding: 3px 8px;
+      margin-bottom: 6px;
+      letter-spacing: .04em;
+    }
+
+    .fp-resumo-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: .78rem;
+      padding: 2px 0;
+      border-bottom: 1px solid #f0f4f8;
+    }
+
+    .fp-resumo-row .r-label { color: #374151; }
+    .fp-resumo-row .r-val { font-weight: 700; color: #0d2137; min-width: 60px; text-align: right; }
+    .fp-resumo-row .r-val.pos { color: #1a7a4a; }
+    .fp-resumo-row .r-val.neg { color: #b91c1c; }
+
+    /* Navegação de mês */
+    .fp-nav-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+      padding: 8px 0;
+    }
+
+    /* Tabela de ponto */
+    .fp-table-wrap {
+      overflow-x: auto;
+      border: 1px solid #b0c4d8;
+      border-radius: 0;
+    }
+
+    .fp-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .76rem;
+      background: #fff;
+    }
+
+    .fp-table thead tr {
+      background: #1a3a5c;
+      color: #fff;
+    }
+
+    .fp-table thead th {
+      padding: 6px 6px;
+      text-align: center;
+      font-weight: 600;
+      font-size: .73rem;
+      border-right: 1px solid #2a4a6c;
+      white-space: nowrap;
+    }
+
+    .fp-table thead th:last-child { border-right: none; }
+
+    .fp-table tbody tr {
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .fp-table tbody tr:nth-child(even) { background: #f8fafc; }
+    .fp-table tbody tr.tr-fds { background: #e8f0f8 !important; }
+    .fp-table tbody tr.tr-feriado { background: #fef3c7 !important; }
+    .fp-table tbody tr.tr-hoje { background: #e6f4ed !important; }
+    .fp-table tbody tr.tr-preenchido { background: #eef6ff !important; }
+
+    .fp-table tbody td {
+      padding: 3px 5px;
+      text-align: center;
+      border-right: 1px solid #e2e8f0;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    .fp-table tbody td:last-child { border-right: none; }
+
+    .fp-table input[type="time"] {
+      border: 1px solid #cbd5e1;
+      border-radius: 3px;
+      padding: 2px 4px;
+      font-size: .75rem;
+      width: 82px;
+      text-align: center;
+      background: #fff;
+    }
+
+    .fp-table input[type="time"]:focus {
+      outline: 2px solid #2563a8;
+      border-color: #2563a8;
+    }
+
+    .fp-table input[type="time"]:disabled,
+    .fp-table select:disabled {
+      background: #f1f5f9;
+      color: #94a3b8;
+      cursor: not-allowed;
+    }
+
+    .fp-table select {
+      border: 1px solid #cbd5e1;
+      border-radius: 3px;
+      padding: 2px 4px;
+      font-size: .73rem;
+      background: #fff;
+      max-width: 110px;
+    }
+
+    .fp-table .td-ht { font-weight: 700; color: #0d2137; }
+    .fp-table .td-saldo-pos { color: #1a7a4a; font-weight: 700; }
+    .fp-table .td-saldo-neg { color: #b91c1c; font-weight: 700; }
+    .fp-table .td-saldo-zer { color: #64748b; }
+
+    .fp-table .badge-util    { background: #dbeafe; color: #1e40af; padding: 1px 6px; border-radius: 3px; font-size: .7rem; }
+    .fp-table .badge-fds     { background: #e0e7ef; color: #475569; padding: 1px 6px; border-radius: 3px; font-size: .7rem; }
+    .fp-table .badge-feriado { background: #fef9c3; color: #92400e; padding: 1px 6px; border-radius: 3px; font-size: .7rem; }
+
+    /* Botão de observações */
+    .btn-obs {
+      background: #e3f0fc;
+      border: 1px solid #93c5fd;
+      border-radius: 3px;
+      padding: 2px 7px;
+      font-size: .7rem;
+      cursor: pointer;
+      color: #1e40af;
+      white-space: nowrap;
+    }
+    .btn-obs:hover { background: #bfdbfe; }
+    .btn-obs.tem-obs { background: #dbeafe; font-weight: 700; }
+
+    /* Botão salvar */
+    .btn-salvar-linha {
+      background: #1a3a5c;
+      color: #fff;
+      border: none;
+      border-radius: 3px;
+      padding: 3px 10px;
+      font-size: .72rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-salvar-linha:hover { background: #2563a8; }
+
+    .save-ind { font-size: .7rem; display: block; }
+    .save-ind.ok  { color: #1a7a4a; }
+    .save-ind.err { color: #b91c1c; }
+
+    /* Aviso período fechado */
+    .fp-aviso-fechado {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 4px;
+      padding: 8px 14px;
+      margin-bottom: 10px;
+      font-size: .82rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Área de assinaturas */
+    .fp-assinaturas {
+      margin-top: 32px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 48px;
+      padding: 0 24px;
+    }
+
+    .fp-assinatura-box {
+      text-align: center;
+    }
+
+    .fp-assinatura-linha {
+      border-top: 1px solid #374151;
+      margin-bottom: 6px;
+      margin-top: 48px;
+    }
+
+    .fp-assinatura-nome {
+      font-size: .8rem;
+      color: #374151;
+      font-weight: 600;
+    }
+
+    .fp-assinatura-cargo {
+      font-size: .72rem;
+      color: #64748b;
+    }
+
+    .fp-assinatura-status {
+      font-size: .72rem;
+      margin-top: 4px;
+    }
+
+    .fp-assinatura-status.assinado { color: #1a7a4a; font-weight: 700; }
+    .fp-assinatura-status.pendente { color: #b45309; }
+
+    .btn-assinar {
+      background: #1a3a5c;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 6px 18px;
+      font-size: .8rem;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    .btn-assinar:hover { background: #2563a8; }
+    .btn-assinar:disabled { background: #94a3b8; cursor: not-allowed; }
+
+    /* Modal de observações */
+    .obs-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      padding: 16px;
+      animation: fadeIn .15s ease;
+    }
+
+    .obs-modal-box {
+      background: #fff;
+      border-radius: 10px;
+      padding: 28px;
+      width: 100%;
+      max-width: 580px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.2);
+      animation: slideUp .2s ease;
+    }
+
+    .obs-modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .obs-modal-header h3 { font-size: 1rem; color: #0d2137; }
+
+    .obs-modal-close {
+      background: none;
+      border: none;
+      font-size: 1.2rem;
+      cursor: pointer;
+      color: #64748b;
+      padding: 4px;
+      border-radius: 4px;
+    }
+    .obs-modal-close:hover { background: #f1f5f9; color: #0d2137; }
+
+    .obs-modal-textarea {
+      width: 100%;
+      min-height: 160px;
+      max-height: 320px;
+      resize: vertical;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-size: .88rem;
+      font-family: inherit;
+      color: #0d2137;
+      line-height: 1.5;
+    }
+    .obs-modal-textarea:focus { outline: 2px solid #2563a8; border-color: #2563a8; }
+
+    .obs-char-count {
+      text-align: right;
+      font-size: .72rem;
+      color: #64748b;
+      margin-top: 4px;
+    }
+    .obs-char-count.warn { color: #b45309; }
+
+    .obs-modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    @media print {
+      .app-header, .fp-nav-bar, .btn-salvar-linha, .btn-obs,
+      .btn-assinar, .fp-aviso-fechado, #btnImprimir { display: none !important; }
+      .fp-table input, .fp-table select { border: none; background: transparent; }
+      body { background: #fff; }
+      .fp-wrap { padding: 8px; }
     }
   </style>
 </head>
@@ -40,8 +430,8 @@
       </a>
       <nav>
         <a href="/" id="navDashboard">Dashboard</a>
-        <a href="/ponto.html" class="active" id="navPonto">Meu Ponto</a>
-        <a href="/configurar-2fa.html" id="navConfig">Segurança</a>
+        <a href="/ponto.html" class="active">Meu Ponto</a>
+        <a href="/configurar-2fa.html">Segurança</a>
         <a href="/admin.html" id="navAdmin" class="hidden">Administração</a>
       </nav>
       <div class="header-user">
@@ -50,108 +440,176 @@
       </div>
     </header>
 
-    <main class="app-main">
-      <!-- Cabeçalho com navegação de mês -->
-      <div class="flex-center gap-12 mb-16" style="justify-content: space-between; flex-wrap: wrap;">
-        <div>
-          <h1>Folha de Ponto</h1>
-          <p id="subtitulo" style="margin-top: 4px; color: var(--muted);">Registre seus horários diários</p>
-        </div>
+    <main class="fp-wrap">
+      <!-- Barra de navegação de mês -->
+      <div class="fp-nav-bar">
         <div class="mes-nav-group">
           <button class="btn-nav-arrow" id="btnMesAnterior" title="Mês anterior">&#8249;</button>
           <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
-            <span id="mesAtualLabel" style="font-weight:700; font-size:1.05rem; min-width:160px; text-align:center;">—</span>
+            <span id="mesAtualLabel" style="font-weight:700; font-size:1rem; min-width:160px; text-align:center;">—</span>
             <select id="selectPeriodo" class="select-periodo" title="Ir para período">
               <option value="">Ir para período...</option>
             </select>
           </div>
           <button class="btn-nav-arrow" id="btnProximoMes" title="Próximo mês">&#8250;</button>
-          <button class="btn btn-secondary btn-sm" id="btnImprimir" style="margin-left:8px;">🖨 Imprimir</button>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <button class="btn btn-secondary btn-sm" id="btnFecharPeriodo">🔒 Fechar Período</button>
+          <button class="btn btn-primary btn-sm" id="btnImprimir">🖨 Imprimir</button>
         </div>
       </div>
 
-      <!-- Aviso de período fechado -->
-      <div id="avisoPeriodoFechado" class="periodo-fechado-aviso hidden">
+      <!-- Aviso período fechado -->
+      <div id="avisoPeriodoFechado" class="fp-aviso-fechado hidden">
         🔒 <strong>Período fechado.</strong> Os registros são somente leitura.
-        <span id="btnReabrirInline" class="hidden">
-          <button class="btn btn-outline btn-sm" onclick="reabrirPeriodo()">Reabrir</button>
-        </span>
+        <button class="btn btn-outline btn-sm hidden" id="btnReabrir" onclick="reabrirPeriodo()">Reabrir</button>
       </div>
 
-      <!-- Resumo rápido -->
-      <div class="metrics-grid mb-16" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));">
-        <div class="metric-card">
-          <div class="label">Dias Trabalhados</div>
-          <div class="value neutral" id="rDiasTrab">—</div>
+      <!-- Cabeçalho institucional -->
+      <div class="fp-header-inst">Controle de Ponto e Banco de Horas</div>
+
+      <div class="fp-header-empresa">
+        <div class="fp-logo-box">
+          <div class="logo-mark" style="width:54px;height:54px;background:#1a3a5c;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.5rem;font-weight:900;">N</div>
         </div>
-        <div class="metric-card">
-          <div class="label">H. Previstas</div>
-          <div class="value neutral" id="rHorasPrev">—</div>
+        <div class="fp-empresa-info">
+          <strong>NEW ELEVADORES E ESCADAS ROLANTES LTDA</strong>
+          <span>Planilha mensal para controle de jornada, banco de horas, feriados e ocorrências.</span>
         </div>
-        <div class="metric-card">
-          <div class="label">H. Trabalhadas</div>
-          <div class="value" id="rHorasTrab">—</div>
+      </div>
+
+      <!-- Campos do colaborador -->
+      <div class="fp-campos-grid">
+        <div class="fp-campo">
+          <span class="label">Colaborador:</span>
+          <span class="valor" id="fcNome">—</span>
         </div>
-        <div class="metric-card">
-          <div class="label">Crédito BH</div>
-          <div class="value positive" id="rCredito">—</div>
+        <div class="fp-campo">
+          <span class="label">Cargo:</span>
+          <span class="valor" id="fcCargo">—</span>
         </div>
-        <div class="metric-card">
-          <div class="label">Débito BH</div>
-          <div class="value negative" id="rDebito">—</div>
+        <div class="fp-campo">
+          <span class="label">Mês/Ano:</span>
+          <span class="valor" id="fcMesAno">—</span>
         </div>
-        <div class="metric-card">
-          <div class="label">Saldo do Mês</div>
-          <div class="value" id="rSaldoMes">—</div>
+        <div class="fp-campo" style="grid-column: span 3;">
+          <span class="label">Saldo Anterior (h):</span>
+          <span class="valor" id="fcSaldoAnterior">0,00</span>
         </div>
-        <div class="metric-card">
-          <div class="label">Saldo Anterior</div>
-          <div class="value neutral" id="rSaldoAnterior">—</div>
+        <div class="fp-campo">
+          <span class="label">Setor:</span>
+          <span class="valor" id="fcSetor">—</span>
         </div>
-        <div class="metric-card" style="border:2px solid var(--primary);">
-          <div class="label">Saldo Acumulado</div>
-          <div class="value" id="rSaldoFinal">—</div>
+        <div class="fp-campo">
+          <span class="label">Gestor:</span>
+          <span class="valor" id="fcGestor">—</span>
+        </div>
+        <div class="fp-campo">
+          <span class="label">Jornada padrão:</span>
+          <span class="valor" id="fcJornada">—</span>
+        </div>
+        <div class="fp-campo">
+          <span class="label">Carga diária:</span>
+          <span class="valor" id="fcCarga">—</span>
+        </div>
+        <div class="fp-campo" style="grid-column: span 2;">
+          <span class="label">Unidade:</span>
+          <span class="valor" id="fcUnidade">—</span>
+        </div>
+      </div>
+
+      <!-- Resumo do mês -->
+      <div class="fp-resumo-grid">
+        <div class="fp-resumo-left">
+          <div class="fp-resumo-title">RESUMO DO MÊS</div>
+          <div class="fp-resumo-row"><span class="r-label">Dias Úteis</span><span class="r-val" id="rDiasUteis">—</span></div>
+          <div class="fp-resumo-row"><span class="r-label">Horas Previstas</span><span class="r-val" id="rHorasPrev">—</span></div>
+          <div class="fp-resumo-row"><span class="r-label">Horas Trabalhadas</span><span class="r-val" id="rHorasTrab">—</span></div>
+          <div class="fp-resumo-row"><span class="r-label">Crédito</span><span class="r-val pos" id="rCredito">—</span></div>
+          <div class="fp-resumo-row"><span class="r-label">Débito</span><span class="r-val neg" id="rDebito">—</span></div>
+          <div class="fp-resumo-row"><span class="r-label">Saldo do Mês</span><span class="r-val" id="rSaldoMes">—</span></div>
+          <div class="fp-resumo-row"><span class="r-label">Saldo Final</span><span class="r-val" id="rSaldoFinal">—</span></div>
+        </div>
+        <div class="fp-resumo-right">
+          <div class="fp-resumo-title">LEGENDA</div>
+          <div style="font-size:.73rem; color:#374151; line-height:1.8;">
+            <span class="fp-table badge-util">Dia útil</span> &nbsp;
+            <span class="fp-table badge-fds">Fim de semana</span> &nbsp;
+            <span class="fp-table badge-feriado">Feriado</span><br><br>
+            Preencha as células em amarelo. Dias sem horário não entram como débito até o ponto ser preenchido ou marcada uma ocorrência.
+          </div>
         </div>
       </div>
 
       <!-- Tabela de ponto -->
-      <div class="card" style="padding: 0; overflow: hidden;">
-        <div class="ponto-wrap">
-          <table class="ponto-table" id="tabelaPonto">
-            <thead>
-              <tr>
-                <th>Data</th>
-                <th>Dia</th>
-                <th>Tipo</th>
-                <th>Entrada</th>
-                <th>Saída Almoço</th>
-                <th>Retorno</th>
-                <th>Saída</th>
-                <th>Ocorrência</th>
-                <th>H. Trabalhadas</th>
-                <th>H. Previstas</th>
-                <th>Saldo</th>
-                <th>Observações</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="corpoTabela">
-              <tr><td colspan="13" style="text-align:center; padding: 32px; color: var(--muted);">Carregando...</td></tr>
-            </tbody>
-          </table>
-        </div>
+      <div class="fp-table-wrap">
+        <table class="fp-table" id="tabelaPonto">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Dia</th>
+              <th>Tipo de Dia</th>
+              <th>Entrada</th>
+              <th>Saída Almoço</th>
+              <th>Retorno Almoço</th>
+              <th>Saída</th>
+              <th>Intervalo</th>
+              <th>Horas Trabalhadas</th>
+              <th>Ocorrência</th>
+              <th>Horas Previstas</th>
+              <th>Crédito BH</th>
+              <th>Débito BH</th>
+              <th>Saldo Dia</th>
+              <th>Observações</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="corpoTabela">
+            <tr><td colspan="16" style="text-align:center; padding:24px; color:#64748b;">Carregando...</td></tr>
+          </tbody>
+        </table>
       </div>
 
-      <!-- Legenda -->
-      <div class="flex-center gap-12 mt-16" style="flex-wrap: wrap;">
-        <span class="badge util">Dia útil</span>
-        <span class="badge fds">Fim de semana</span>
-        <span class="badge feriado">Feriado</span>
-        <span style="font-size: .78rem; color: var(--muted);">
-          Clique em <strong>Salvar</strong> após preencher os horários de cada dia.
-        </span>
+      <!-- Assinaturas -->
+      <div class="fp-assinaturas" id="secaoAssinaturas">
+        <div class="fp-assinatura-box">
+          <div class="fp-assinatura-linha"></div>
+          <div class="fp-assinatura-nome" id="assNomeColab">—</div>
+          <div class="fp-assinatura-cargo">Assinatura do Colaborador</div>
+          <div class="fp-assinatura-status" id="assStatusColab">Pendente de assinatura</div>
+          <button class="btn-assinar" id="btnAssinarColab" onclick="assinarFolha('colaborador')">
+            ✍ Assinar como Colaborador
+          </button>
+        </div>
+        <div class="fp-assinatura-box">
+          <div class="fp-assinatura-linha"></div>
+          <div class="fp-assinatura-nome" id="assNomeGestor">—</div>
+          <div class="fp-assinatura-cargo">Assinatura do Gestor</div>
+          <div class="fp-assinatura-status" id="assStatusGestor">Pendente de assinatura</div>
+          <button class="btn-assinar hidden" id="btnAssinarGestor" onclick="assinarFolha('gestor')">
+            ✍ Assinar como Gestor
+          </button>
+        </div>
       </div>
     </main>
+  </div>
+
+  <!-- Modal de Observações -->
+  <div id="obsModalOverlay" class="obs-modal-overlay hidden">
+    <div class="obs-modal-box">
+      <div class="obs-modal-header">
+        <h3 id="obsModalTitulo">Observações</h3>
+        <button class="obs-modal-close" onclick="fecharModalObs()">✕</button>
+      </div>
+      <textarea id="obsModalTexto" class="obs-modal-textarea"
+        maxlength="600"
+        placeholder="Digite as observações para este dia (máx. 600 caracteres)..."></textarea>
+      <div class="obs-char-count" id="obsCharCount">0 / 600</div>
+      <div class="obs-modal-footer">
+        <button class="btn btn-secondary" onclick="fecharModalObs()">Cancelar</button>
+        <button class="btn btn-primary" onclick="salvarObs()">Salvar Observação</button>
+      </div>
+    </div>
   </div>
 
   <script src="/assets/js/app.js"></script>
@@ -168,21 +626,25 @@
                          'Compensação', 'Falta', 'Banco de Horas', 'Meio período', 'Outro'];
     const HOJE = new Date().toISOString().slice(0, 10);
 
-    // Ler mês da URL se vier do dashboard
     const urlParams = new URLSearchParams(window.location.search);
     let mesAtual = urlParams.get('mes') || mesAnoAtual();
     let gradeAtual = [];
-    let periodoAtual = null;
-    let periodosCache = [];
     let periodoFechado = false;
+    let periodosCache = [];
+    let perfilUsuario = null;
 
-    // Navegação
+    // Obs modal state
+    let obsModalData = null;
+    let obsModalTr = null;
+
+    // ── Navegação ──
     document.getElementById('btnMesAnterior').onclick = () => navegarMes(-1);
     document.getElementById('btnProximoMes').onclick  = () => navegarMes(1);
     document.getElementById('selectPeriodo').addEventListener('change', function() {
       if (this.value) { mesAtual = this.value; carregarPonto(); }
     });
     document.getElementById('btnImprimir').onclick = () => window.print();
+    document.getElementById('btnFecharPeriodo').onclick = fecharPeriodo;
 
     function navegarMes(delta) {
       const [ano, mes] = mesAtual.split('-').map(Number);
@@ -193,20 +655,50 @@
       carregarPonto();
     }
 
-    function formatData(d) {
+    function fmt(d) {
       const [a, m, dia] = d.split('-');
       return `${dia}/${m}/${a}`;
     }
 
+    function fmtHoras(h) { return UI.formatHoras(h); }
+
+    function fmtSaldoNum(h) {
+      if (h == null) return '—';
+      const f = fmtHoras(h);
+      return h > 0.01 ? `+${f}` : f;
+    }
+
+    function saldoClass(h) {
+      if (h == null || (h > -0.01 && h < 0.01)) return 'td-saldo-zer';
+      return h > 0 ? 'td-saldo-pos' : 'td-saldo-neg';
+    }
+
+    function atualizarCamposColaborador(usuario, resumo) {
+      document.getElementById('fcNome').textContent    = usuario.nome || '—';
+      document.getElementById('fcCargo').textContent   = usuario.cargo || '—';
+      document.getElementById('fcSetor').textContent   = usuario.setor || '—';
+      document.getElementById('fcGestor').textContent  = usuario.gestor || '—';
+      document.getElementById('fcJornada').textContent = usuario.jornada_padrao || '—';
+      document.getElementById('fcCarga').textContent   = (usuario.carga_diaria || 8.5).toFixed(2);
+      document.getElementById('fcUnidade').textContent = usuario.unidade || 'Manaus/AM';
+      document.getElementById('fcMesAno').textContent  = resumo?.mes_ano || mesAtual.split('-').reverse().join('/');
+      document.getElementById('fcSaldoAnterior').textContent = fmtHoras(resumo?.saldo_anterior || 0).replace(':',',').replace(/^(-?)(\d+),(\d+)$/, '$1$2,$3');
+      document.getElementById('assNomeColab').textContent = usuario.nome || '—';
+      document.getElementById('assNomeGestor').textContent = usuario.gestor || 'Gestor';
+    }
+
     function atualizarResumo(resumo) {
-      document.getElementById('rDiasTrab').textContent     = resumo.dias_trabalhados ?? '—';
-      document.getElementById('rHorasPrev').textContent    = UI.formatHoras(resumo.horas_previstas);
-      document.getElementById('rHorasTrab').textContent    = UI.formatHoras(resumo.horas_trabalhadas);
-      document.getElementById('rCredito').textContent      = UI.formatHoras(resumo.credito);
-      document.getElementById('rDebito').textContent       = UI.formatHoras(resumo.debito);
-      document.getElementById('rSaldoAnterior').textContent = UI.formatHoras(resumo.saldo_anterior);
-      document.getElementById('rSaldoMes').innerHTML       = UI.formatSaldo(resumo.saldo_mes);
-      document.getElementById('rSaldoFinal').innerHTML     = UI.formatSaldo(resumo.saldo_final);
+      document.getElementById('rDiasUteis').textContent  = resumo.dias_trabalhados ?? '—';
+      document.getElementById('rHorasPrev').textContent  = fmtHoras(resumo.horas_previstas);
+      document.getElementById('rHorasTrab').textContent  = fmtHoras(resumo.horas_trabalhadas);
+      document.getElementById('rCredito').textContent    = fmtHoras(resumo.credito);
+      document.getElementById('rDebito').textContent     = fmtHoras(resumo.debito);
+      const sm = document.getElementById('rSaldoMes');
+      sm.textContent = fmtSaldoNum(resumo.saldo_mes);
+      sm.className = 'r-val ' + (resumo.saldo_mes > 0.01 ? 'pos' : resumo.saldo_mes < -0.01 ? 'neg' : '');
+      const sf = document.getElementById('rSaldoFinal');
+      sf.textContent = fmtSaldoNum(resumo.saldo_final);
+      sf.className = 'r-val ' + (resumo.saldo_final > 0.01 ? 'pos' : resumo.saldo_final < -0.01 ? 'neg' : '');
     }
 
     function atualizarSelectPeriodos() {
@@ -228,53 +720,52 @@
         const isFds = linha.tipo_dia === 'Fim de semana';
         const isFer = linha.tipo_dia === 'Feriado';
         const isHoje = linha.data === HOJE;
-        const isPreenchido = linha.entrada || linha.ocorrencia;
+        const isPreenchido = !!(linha.entrada || linha.ocorrencia);
 
-        if (isFds) tr.classList.add('fim-semana');
-        else if (isFer) tr.classList.add('feriado');
-        else if (isHoje) tr.classList.add('hoje');
-        else if (isPreenchido) tr.classList.add('preenchido');
+        if (isFds) tr.classList.add('tr-fds');
+        else if (isFer) tr.classList.add('tr-feriado');
+        else if (isHoje) tr.classList.add('tr-hoje');
+        else if (isPreenchido) tr.classList.add('tr-preenchido');
 
-        // Desabilitar se fim de semana, feriado, ou período fechado (não admin)
         const disabled = isFds || isFer || (fechado && !Sessao.isAdmin());
 
+        // Calcular intervalo para exibição
+        const intervalo = calcIntervaloDisplay(linha.saida_almoco, linha.retorno_almoco);
+
+        // Badge tipo dia
+        const tipoBadge = isFds ? 'badge-fds' : isFer ? 'badge-feriado' : 'badge-util';
+        const tipoLabel = isFds ? 'Fim de semana' : isFer ? 'Feriado' : 'Dia útil';
+
         tr.innerHTML = `
-          <td class="col-data">${formatData(linha.data)}</td>
-          <td class="col-dia">${linha.dia}</td>
-          <td class="col-tipo">${UI.badgeTipoDia(linha.tipo_dia)}</td>
-          <td class="col-hora">
-            <input type="time" class="campo-hora" data-campo="entrada" data-data="${linha.data}"
-                   value="${linha.entrada || ''}" ${disabled ? 'disabled' : ''}>
-          </td>
-          <td class="col-hora">
-            <input type="time" class="campo-hora" data-campo="saida_almoco" data-data="${linha.data}"
-                   value="${linha.saida_almoco || ''}" ${disabled ? 'disabled' : ''}>
-          </td>
-          <td class="col-hora">
-            <input type="time" class="campo-hora" data-campo="retorno_almoco" data-data="${linha.data}"
-                   value="${linha.retorno_almoco || ''}" ${disabled ? 'disabled' : ''}>
-          </td>
-          <td class="col-hora">
-            <input type="time" class="campo-hora" data-campo="saida" data-data="${linha.data}"
-                   value="${linha.saida || ''}" ${disabled ? 'disabled' : ''}>
-          </td>
-          <td class="col-oc">
-            <select class="campo-oc" data-data="${linha.data}" ${disabled ? 'disabled' : ''}>
-              ${OCORRENCIAS.map(o => `<option value="${o}" ${o === (linha.ocorrencia || '') ? 'selected' : ''}>${o || '—'}</option>`).join('')}
+          <td>${fmt(linha.data)}</td>
+          <td>${linha.dia}</td>
+          <td><span class="${tipoBadge}">${tipoLabel}</span></td>
+          <td><input type="time" maxlength="5" data-campo="entrada" data-data="${linha.data}" value="${linha.entrada||''}" ${disabled?'disabled':''}></td>
+          <td><input type="time" maxlength="5" data-campo="saida_almoco" data-data="${linha.data}" value="${linha.saida_almoco||''}" ${disabled?'disabled':''}></td>
+          <td><input type="time" maxlength="5" data-campo="retorno_almoco" data-data="${linha.data}" value="${linha.retorno_almoco||''}" ${disabled?'disabled':''}></td>
+          <td><input type="time" maxlength="5" data-campo="saida" data-data="${linha.data}" value="${linha.saida||''}" ${disabled?'disabled':''}></td>
+          <td id="int-${linha.data}" class="td-ht">${intervalo}</td>
+          <td id="ht-${linha.data}" class="td-ht">${fmtHoras(linha.horas_trabalhadas)}</td>
+          <td>
+            <select data-data="${linha.data}" ${disabled?'disabled':''}>
+              ${OCORRENCIAS.map(o => `<option value="${o}" ${o===(linha.ocorrencia||'')?'selected':''}>${o||'—'}</option>`).join('')}
             </select>
           </td>
-          <td class="col-ht" id="ht-${linha.data}">${UI.formatHoras(linha.horas_trabalhadas)}</td>
-          <td class="col-bh">${UI.formatHoras(linha.horas_previstas)}</td>
-          <td class="col-bh" id="saldo-${linha.data}">${UI.formatSaldo(linha.saldo_dia)}</td>
-          <td class="col-obs">
-            <input type="text" class="obs-input campo-obs" data-data="${linha.data}"
-                   value="${(linha.observacoes || '').replace(/"/g, '&quot;')}"
-                   maxlength="200" placeholder="obs..." ${disabled ? 'disabled' : ''}>
+          <td>${fmtHoras(linha.horas_previstas)}</td>
+          <td class="${saldoClass(linha.credito_bh)}" id="cred-${linha.data}">${fmtHoras(linha.credito_bh)}</td>
+          <td class="${saldoClass(-linha.debito_bh)}" id="deb-${linha.data}">${fmtHoras(linha.debito_bh)}</td>
+          <td class="${saldoClass(linha.saldo_dia)}" id="saldo-${linha.data}">${fmtSaldoNum(linha.saldo_dia)}</td>
+          <td>
+            <button class="btn-obs ${linha.observacoes ? 'tem-obs' : ''}" data-data="${linha.data}"
+              title="${linha.observacoes ? 'Ver/editar observação' : 'Adicionar observação'}"
+              ${disabled ? 'disabled style="opacity:.5;cursor:not-allowed;"' : ''}>
+              ${linha.observacoes ? '📝 Ver' : '+ Obs'}
+            </button>
           </td>
-          <td class="col-save">
+          <td>
             ${disabled ? '' : `
-              <button class="btn btn-primary btn-sm btn-salvar" data-data="${linha.data}">Salvar</button>
-              <span class="save-indicator hidden" id="ind-${linha.data}"></span>
+              <button class="btn-salvar-linha" data-data="${linha.data}">Salvar</button>
+              <span class="save-ind hidden" id="ind-${linha.data}"></span>
             `}
           </td>
         `;
@@ -283,27 +774,92 @@
       }
 
       // Event listeners
-      tbody.querySelectorAll('.btn-salvar').forEach(btn => {
+      tbody.querySelectorAll('.btn-salvar-linha').forEach(btn => {
         btn.addEventListener('click', () => salvarLinha(btn.dataset.data, btn.closest('tr')));
       });
-      tbody.querySelectorAll('.campo-hora').forEach(input => {
+
+      tbody.querySelectorAll('.btn-obs:not([disabled])').forEach(btn => {
+        btn.addEventListener('click', () => abrirModalObs(btn.dataset.data, btn.closest('tr')));
+      });
+
+      // Enter avança para próximo campo
+      tbody.querySelectorAll('input[type="time"]').forEach((input, idx, all) => {
         input.addEventListener('keydown', (e) => {
           if (e.key === 'Enter') {
-            const campos = Array.from(tbody.querySelectorAll('.campo-hora, .campo-oc'));
-            const idx = campos.indexOf(input);
-            if (idx >= 0 && idx < campos.length - 1) campos[idx + 1].focus();
+            const next = all[idx + 1];
+            if (next) next.focus();
           }
         });
       });
     }
 
-    async function salvarLinha(data, tr) {
+    function calcIntervaloDisplay(saidaAlmoco, retornoAlmoco) {
+      if (!saidaAlmoco || !retornoAlmoco) return '—';
+      const [sh, sm] = saidaAlmoco.split(':').map(Number);
+      const [rh, rm] = retornoAlmoco.split(':').map(Number);
+      const diff = (rh * 60 + rm) - (sh * 60 + sm);
+      if (diff <= 0) return '—';
+      return `${String(Math.floor(diff/60)).padStart(2,'0')}:${String(diff%60).padStart(2,'0')}`;
+    }
+
+    // ── Modal de Observações ──
+    function abrirModalObs(data, tr) {
+      obsModalData = data;
+      obsModalTr = tr;
+      const linha = gradeAtual.find(r => r.data === data);
+      const obs = linha ? (linha.observacoes || '') : '';
+      const [a, m, d] = data.split('-');
+      document.getElementById('obsModalTitulo').textContent = `Observações — ${d}/${m}/${a}`;
+      const textarea = document.getElementById('obsModalTexto');
+      textarea.value = obs;
+      atualizarContadorObs(obs.length);
+      document.getElementById('obsModalOverlay').classList.remove('hidden');
+      setTimeout(() => textarea.focus(), 100);
+    }
+
+    function fecharModalObs() {
+      document.getElementById('obsModalOverlay').classList.add('hidden');
+      obsModalData = null;
+      obsModalTr = null;
+    }
+
+    function atualizarContadorObs(len) {
+      const el = document.getElementById('obsCharCount');
+      el.textContent = `${len} / 600`;
+      el.className = 'obs-char-count' + (len > 500 ? ' warn' : '');
+    }
+
+    document.getElementById('obsModalTexto').addEventListener('input', function() {
+      atualizarContadorObs(this.value.length);
+    });
+
+    document.getElementById('obsModalOverlay').addEventListener('click', function(e) {
+      if (e.target === this) fecharModalObs();
+    });
+
+    async function salvarObs() {
+      if (!obsModalData) return;
+      const obs = document.getElementById('obsModalTexto').value.slice(0, 600);
+      const tr = obsModalTr;
+      const data = obsModalData;
+      fecharModalObs();
+
+      // Atualizar na grade local
+      const idx = gradeAtual.findIndex(r => r.data === data);
+      if (idx >= 0) gradeAtual[idx].observacoes = obs;
+
+      // Salvar via API (junto com os outros campos da linha)
+      if (tr) await salvarLinha(data, tr, obs);
+    }
+
+    async function salvarLinha(data, tr, obsOverride) {
       const getVal = (campo) => {
         const el = tr.querySelector(`[data-campo="${campo}"]`);
         return el ? el.value : '';
       };
-      const ocEl  = tr.querySelector('.campo-oc');
-      const obsEl = tr.querySelector('.campo-obs');
+      const ocEl = tr.querySelector('select[data-data="' + data + '"]');
+      const idx = gradeAtual.findIndex(r => r.data === data);
+      const obsAtual = obsOverride !== undefined ? obsOverride : (idx >= 0 ? gradeAtual[idx].observacoes || '' : '');
 
       const payload = {
         data,
@@ -311,36 +867,53 @@
         saida_almoco:   getVal('saida_almoco')   || null,
         retorno_almoco: getVal('retorno_almoco') || null,
         saida:          getVal('saida')          || null,
-        ocorrencia:     ocEl  ? ocEl.value  : null,
-        observacoes:    obsEl ? obsEl.value : ''
+        ocorrencia:     ocEl ? ocEl.value : null,
+        observacoes:    obsAtual.slice(0, 600)
       };
 
-      tr.classList.add('row-saving');
       const ind = document.getElementById(`ind-${data}`);
-      if (ind) { ind.className = 'save-indicator'; ind.textContent = '⏳'; }
+      if (ind) { ind.className = 'save-ind'; ind.textContent = '⏳'; }
+      tr.style.opacity = '.7';
 
       try {
         const res = await api('salvarPonto', payload);
-        if (ind) { ind.textContent = '✓'; ind.className = 'save-indicator'; }
 
-        document.getElementById(`ht-${data}`).textContent = UI.formatHoras(res.horasTrabalhadas);
-        document.getElementById(`saldo-${data}`).innerHTML = UI.formatSaldo(res.saldoDia);
+        if (ind) { ind.textContent = '✓ Salvo'; ind.className = 'save-ind ok'; }
 
-        const idx = gradeAtual.findIndex(r => r.data === data);
-        if (idx >= 0) {
-          gradeAtual[idx] = { ...gradeAtual[idx], ...payload,
-            horas_trabalhadas: res.horasTrabalhadas,
-            saldo_dia: res.saldoDia };
+        // Atualizar células calculadas
+        document.getElementById(`ht-${data}`).textContent = fmtHoras(res.horasTrabalhadas);
+        const saldoEl = document.getElementById(`saldo-${data}`);
+        saldoEl.textContent = fmtSaldoNum(res.saldoDia);
+        saldoEl.className = saldoClass(res.saldoDia);
+
+        // Atualizar intervalo
+        const intEl = document.getElementById(`int-${data}`);
+        if (intEl) intEl.textContent = calcIntervaloDisplay(payload.saida_almoco, payload.retorno_almoco);
+
+        // Atualizar botão de obs
+        const btnObs = tr.querySelector('.btn-obs');
+        if (btnObs) {
+          btnObs.textContent = obsAtual ? '📝 Ver' : '+ Obs';
+          btnObs.className = 'btn-obs' + (obsAtual ? ' tem-obs' : '');
         }
 
-        // Recarregar resumo atualizado
-        await recarregarResumo();
+        if (idx >= 0) {
+          gradeAtual[idx] = { ...gradeAtual[idx], ...payload,
+            horas_trabalhadas: res.horasTrabalhadas, saldo_dia: res.saldoDia };
+        }
 
-        if (ind) setTimeout(() => { ind.className = 'save-indicator hidden'; }, 3000);
+        // Colorir linha se preenchida
+        if (payload.entrada || payload.ocorrencia) {
+          tr.classList.remove('tr-fds','tr-feriado');
+          tr.classList.add('tr-preenchido');
+        }
+
+        await recarregarResumo();
+        if (ind) setTimeout(() => { ind.className = 'save-ind hidden'; }, 3000);
       } catch (err) {
-        if (ind) { ind.textContent = '✗ ' + (err.message || 'Erro'); ind.className = 'save-indicator error'; }
+        if (ind) { ind.textContent = '✗ ' + (err.message || 'Erro'); ind.className = 'save-ind err'; }
       } finally {
-        tr.classList.remove('row-saving');
+        tr.style.opacity = '1';
       }
     }
 
@@ -351,30 +924,110 @@
       } catch {}
     }
 
+    // ── Assinaturas ──
+    async function carregarAssinaturas() {
+      try {
+        const data = await api('getAssinaturas', { mesAno: mesAtual });
+        const assinaturas = data.assinaturas || [];
+        const colabAss = assinaturas.find(a => a.tipo === 'colaborador');
+        const gestorAss = assinaturas.find(a => a.tipo === 'gestor');
+
+        const statusColab = document.getElementById('assStatusColab');
+        const btnColab = document.getElementById('btnAssinarColab');
+        if (colabAss) {
+          const dt = new Date(colabAss.assinado_em);
+          statusColab.textContent = `✅ Assinado em ${dt.toLocaleDateString('pt-BR')} às ${dt.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})}`;
+          statusColab.className = 'fp-assinatura-status assinado';
+          btnColab.disabled = true;
+          btnColab.textContent = '✅ Assinado';
+        } else {
+          statusColab.textContent = 'Pendente de assinatura';
+          statusColab.className = 'fp-assinatura-status pendente';
+          btnColab.disabled = periodoFechado;
+        }
+
+        const statusGestor = document.getElementById('assStatusGestor');
+        const btnGestor = document.getElementById('btnAssinarGestor');
+        if (Sessao.isAdmin()) btnGestor.classList.remove('hidden');
+        if (gestorAss) {
+          const dt = new Date(gestorAss.assinado_em);
+          statusGestor.textContent = `✅ Assinado em ${dt.toLocaleDateString('pt-BR')} às ${dt.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})}`;
+          statusGestor.className = 'fp-assinatura-status assinado';
+          btnGestor.disabled = true;
+          btnGestor.textContent = '✅ Assinado';
+        } else {
+          statusGestor.textContent = 'Pendente de assinatura';
+          statusGestor.className = 'fp-assinatura-status pendente';
+        }
+      } catch {}
+    }
+
+    async function assinarFolha(tipo) {
+      const confirmMsg = tipo === 'colaborador'
+        ? 'Confirmar assinatura desta folha de ponto como colaborador? Esta ação não pode ser desfeita.'
+        : 'Confirmar assinatura como gestor?';
+      if (!confirm(confirmMsg)) return;
+      try {
+        await api('assinarFolha', { mesAno: mesAtual, tipo });
+        await carregarAssinaturas();
+      } catch (err) {
+        alert('Erro ao assinar: ' + err.message);
+      }
+    }
+
+    async function fecharPeriodo() {
+      if (!confirm(`Fechar o período ${formatarMesAno(mesAtual)}? O saldo será propagado para o próximo mês.`)) return;
+      try {
+        const res = await api('fecharPeriodo', { mesAno: mesAtual });
+        alert(res.mensagem);
+        carregarPonto();
+      } catch (err) { alert('Erro: ' + err.message); }
+    }
+
+    async function reabrirPeriodo() {
+      if (!confirm(`Reabrir o período ${formatarMesAno(mesAtual)}?`)) return;
+      try {
+        const res = await api('reabrirPeriodo', { mesAno: mesAtual });
+        alert(res.mensagem);
+        carregarPonto();
+      } catch (err) { alert('Erro: ' + err.message); }
+    }
+
     async function carregarPonto() {
       document.getElementById('corpoTabela').innerHTML =
-        '<tr><td colspan="13" style="text-align:center; padding: 32px; color: var(--muted);">Carregando...</td></tr>';
+        '<tr><td colspan="16" style="text-align:center; padding:24px; color:#64748b;">Carregando...</td></tr>';
 
       try {
-        const data = await api('listarPonto', { mesAno: mesAtual });
-        periodoAtual = data.periodo;
+        const [data, perfil] = await Promise.all([
+          api('listarPonto', { mesAno: mesAtual }),
+          api('getMeuPerfil')
+        ]);
+
+        perfilUsuario = perfil.usuario;
         periodosCache = data.periodos || [];
-        const fechado = periodoAtual && periodoAtual.status === 'fechado';
+        const fechado = data.periodo && data.periodo.status === 'fechado';
 
         // Label do mês
         document.getElementById('mesAtualLabel').textContent = data.resumo?.mes_label || formatarMesAno(mesAtual);
-        document.getElementById('subtitulo').textContent = `${formatarMesAno(mesAtual)} · ${fechado ? '🔒 Período fechado' : '🟢 Período aberto'}`;
 
-        // Aviso de período fechado
+        // Aviso fechado
         const aviso = document.getElementById('avisoPeriodoFechado');
+        const btnFechar = document.getElementById('btnFecharPeriodo');
+        const btnReabrir = document.getElementById('btnReabrir');
         if (fechado) {
           aviso.classList.remove('hidden');
-          if (Sessao.isAdmin()) document.getElementById('btnReabrirInline').classList.remove('hidden');
+          btnFechar.classList.add('hidden');
+          if (Sessao.isAdmin()) btnReabrir.classList.remove('hidden');
         } else {
           aviso.classList.add('hidden');
+          btnFechar.classList.remove('hidden');
+          btnReabrir.classList.add('hidden');
         }
 
-        // Select de períodos
+        // Campos colaborador
+        atualizarCamposColaborador(perfil.usuario, data.resumo);
+
+        // Select períodos
         atualizarSelectPeriodos();
 
         // Resumo
@@ -383,20 +1036,15 @@
         // Tabela
         renderTabela(data.grade, fechado);
 
+        // Assinaturas
+        await carregarAssinaturas();
+
       } catch (err) {
         document.getElementById('corpoTabela').innerHTML =
-          `<tr><td colspan="13" style="text-align:center; padding: 32px; color: var(--danger);">${err.message}</td></tr>`;
+          `<tr><td colspan="16" style="text-align:center; padding:24px; color:#b91c1c;">${err.message}</td></tr>`;
       }
     }
 
-    async function reabrirPeriodo() {
-      if (!confirm(`Reabrir o período ${formatarMesAno(mesAtual)}?`)) return;
-      const resp = await api('reabrirPeriodo', { mesAno: mesAtual });
-      if (resp.sucesso) { alert(resp.mensagem); carregarPonto(); }
-      else alert('Erro: ' + resp.erro);
-    }
-
-    // Mostrar app
     document.getElementById('loadingPage').classList.add('hidden');
     document.getElementById('appWrap').classList.remove('hidden');
     carregarPonto();
