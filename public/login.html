@@ -305,7 +305,9 @@
 
         if (data.requer_2fa || data.requer2fa) {
           sessionStorage.setItem('fp_token_2fa', data.token_2fa || data.tokenTemp || '');
+          sessionStorage.setItem('fp_token_temp', data.token_2fa || data.tokenTemp || '');
           sessionStorage.setItem('fp_nome_temp', data.nome || '');
+          sessionStorage.setItem('fp_email_temp', email);
           window.location.replace('/verificar-2fa.html');
           return;
         }
@@ -313,6 +315,7 @@
         sessionStorage.setItem('fp_token',  data.token);
         sessionStorage.setItem('fp_perfil', data.perfil);
         sessionStorage.setItem('fp_nome',   data.nome || '');
+        sessionStorage.setItem('fp_email',  email);
         window.location.replace('/');
 
       } catch {

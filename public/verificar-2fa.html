@@ -48,6 +48,7 @@
   <script>
     const tokenTemp = sessionStorage.getItem('fp_token_temp');
     const nome = sessionStorage.getItem('fp_nome_temp');
+    const emailTemp = sessionStorage.getItem('fp_email_temp') || '';
 
     if (!tokenTemp) {
       window.location.replace('/login.html');
@@ -129,9 +130,11 @@
 
         sessionStorage.removeItem('fp_token_temp');
         sessionStorage.removeItem('fp_nome_temp');
+        sessionStorage.removeItem('fp_email_temp');
         sessionStorage.setItem('fp_token', data.token);
         sessionStorage.setItem('fp_perfil', data.perfil);
         sessionStorage.setItem('fp_nome', data.nome || '');
+        sessionStorage.setItem('fp_email', emailTemp);
         window.location.replace('/');
 
       } catch (err) {

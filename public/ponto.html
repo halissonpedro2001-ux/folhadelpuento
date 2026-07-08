@@ -274,6 +274,11 @@
           <button class="btn-assinar" id="btnAssinarColab" onclick="assinarFolha('colaborador')">
             <span id="iconAssinarColab"></span> Assinar como Colaborador
           </button>
+          <button class="btn-assinar btn-cancelar-ass hidden" id="btnCancelarAssinaturaColab"
+            onclick="cancelarAssinatura('colaborador')"
+            title="Remover assinatura do colaborador (somente admin)">
+            Remover Assinatura
+          </button>
         </div>
         <div class="fp-assinatura-box">
           <div class="fp-assinatura-linha"></div>
@@ -282,6 +287,11 @@
           <div class="fp-assinatura-status" id="assStatusGestor">Pendente de assinatura</div>
           <button class="btn-assinar hidden" id="btnAssinarGestor" onclick="assinarFolha('gestor')">
             <span id="iconAssinarGestor"></span> Assinar como Gestor
+          </button>
+          <button class="btn-assinar btn-cancelar-ass hidden" id="btnCancelarAssinaturaGestor"
+            onclick="cancelarAssinatura('gestor')"
+            title="Remover assinatura do gestor (somente admin)">
+            Remover Assinatura
           </button>
         </div>
       </div>
@@ -340,6 +350,8 @@
     // ── Cache de alterações pendentes ──
     // Estrutura: { "YYYY-MM-DD": { entrada, saida_almoco, retorno_almoco, saida, ocorrencia, observacoes } }
     let pendentes = {};
+    // ID do usuário sendo visualizado (próprio ou outro, quando admin/gestor visualiza folha alheia)
+    let usuarioVisualizadoId = urlParams.get('usuario_id') || null;
 
     function marcarPendente(data, campo, valor) {
       if (!pendentes[data]) pendentes[data] = {};
@@ -556,6 +568,7 @@
             <button class="btn-obs ${linha.observacoes?'tem-obs':''}" ${disabled?'disabled':''}>
               ${obsIcon}
             </button>
+            ${Sessao.isAdmin() && linha.id ? `<button class="btn-excluir-reg" data-id="${linha.id}" data-data="${linha.data}" title="Excluir registro deste dia (admin)">${icon('trash')}</button>` : ''}
           </td>
         `;
 
@@ -581,7 +594,20 @@
 
         const btnObs = tr.querySelector('.btn-obs');
         if (btnObs && !disabled) btnObs.addEventListener('click', () => abrirModalObs(linha.data, tr));
+
+        // Botão de excluir registro (somente admin)
+        const btnExcluir = tr.querySelector('.btn-excluir-reg');
+        if (btnExcluir) btnExcluir.addEventListener('click', () => excluirRegistroPonto(btnExcluir.dataset.id, btnExcluir.dataset.data));
       }
+    }
+
+    async function excluirRegistroPonto(id, data) {
+      if (!id) { alert('Este dia ainda não possui registro salvo.'); return; }
+      if (!confirm(`Excluir o registro do dia ${data.split('-').reverse().join('/')}? Esta ação não pode ser desfeita.`)) return;
+      try {
+        await api('excluirRegistroPonto', { id });
+        await carregarPonto();
+      } catch (err) { alert('Erro ao excluir: ' + err.message); }
     }
 
     // ── Modal Observações ──
@@ -657,7 +683,12 @@
 
         const statusGestor = document.getElementById('assStatusGestor');
         const btnGestor    = document.getElementById('btnAssinarGestor');
-        if (Sessao.isAdmin()) btnGestor.classList.remove('hidden');
+        const btnCancelarGestor = document.getElementById('btnCancelarAssinaturaGestor');
+        const btnCancelarColab  = document.getElementById('btnCancelarAssinaturaColab');
+
+        // Botão de assinar como gestor: apenas Vitória Fonte
+        if (Sessao.isGestor()) btnGestor.classList.remove('hidden');
+
         if (gestorAss) {
           const dt = new Date(gestorAss.assinado_em);
           statusGestor.textContent = `Assinado em ${dt.toLocaleDateString('pt-BR')} às ${dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`;
@@ -665,17 +696,50 @@
           btnGestor.disabled = true;
           document.getElementById('iconAssinarGestor').innerHTML = icon('checkCircle', {color:'#fff'});
           btnGestor.childNodes[1].textContent = ' Assinado';
+          // Admin pode remover assinatura de gestor
+          if (btnCancelarGestor && Sessao.isAdmin()) btnCancelarGestor.classList.remove('hidden');
         } else {
           statusGestor.textContent = 'Pendente de assinatura';
           statusGestor.className = 'fp-assinatura-status pendente';
+          if (btnCancelarGestor) btnCancelarGestor.classList.add('hidden');
+        }
+
+        // Admin pode remover assinatura do colaborador
+        if (btnCancelarColab && Sessao.isAdmin()) {
+          if (colabAss) btnCancelarColab.classList.remove('hidden');
+          else btnCancelarColab.classList.add('hidden');
         }
       } catch {}
     }
 
     async function assinarFolha(tipo) {
-      if (!confirm(tipo === 'colaborador' ? 'Confirmar assinatura como colaborador? Esta ação não pode ser desfeita.' : 'Confirmar assinatura como gestor?')) return;
-      try { await api('assinarFolha', { mesAno: mesAtual, tipo }); await carregarAssinaturas(); }
-      catch (err) { alert('Erro ao assinar: ' + err.message); }
+      const msg = tipo === 'colaborador'
+        ? 'Confirmar assinatura como colaborador? Esta ação não pode ser desfeita.'
+        : 'Confirmar assinatura como gestora? Esta ação não pode ser desfeita.';
+      if (!confirm(msg)) return;
+      try {
+        const params = { mesAno: mesAtual, tipo };
+        // Gestor assina a folha do funcionário visualizado (se for diferente do próprio)
+        if (tipo === 'gestor' && usuarioVisualizadoId && usuarioVisualizadoId !== Sessao.usuarioId) {
+          params.usuario_id = usuarioVisualizadoId;
+        }
+        await api('assinarFolha', params);
+        await carregarAssinaturas();
+      } catch (err) { alert('Erro ao assinar: ' + err.message); }
+    }
+
+    async function cancelarAssinatura(tipo) {
+      if (!confirm(`Remover a assinatura de ${tipo === 'colaborador' ? 'colaborador' : 'gestor'}? Esta ação é irreversível.`)) return;
+      try {
+        // Admin usa excluirAssinatura; gestor usa cancelarAssinatura
+        if (Sessao.isAdmin()) {
+          const uid = usuarioVisualizadoId || Sessao.usuarioId;
+          await api('excluirAssinatura', { mesAno: mesAtual, tipo, usuario_id: uid });
+        } else {
+          await api('cancelarAssinatura', { mesAno: mesAtual, tipo });
+        }
+        await carregarAssinaturas();
+      } catch (err) { alert('Erro ao remover assinatura: ' + err.message); }
     }
 
     async function fecharPeriodo() {

@@ -18,6 +18,9 @@ const TOTP_DIGITS         = 6;
 const TOTP_PERIOD         = 30;
 const TOTP_WINDOW         = 1;
 
+// Gestor autorizado a assinar folhas como gestor
+const GESTOR_EMAIL_AUTORIZADO = 'vitoria.fonte@newelevadores.com';
+
 const OCORRENCIAS = [
   'Trabalhado', 'Folga', 'Atestado', 'Férias',
   'Compensação', 'Falta', 'Banco de Horas', 'Meio período', 'Outro'
@@ -246,6 +249,7 @@ export async function onRequest(context) {
     if (action === 'reabrirPeriodo')    return await handleReabrirPeriodo(db, sessao, body);
     if (action === 'assinarFolha')      return await handleAssinarFolha(db, sessao, body);
     if (action === 'getAssinaturas')    return await handleGetAssinaturas(db, sessao, body);
+    if (action === 'cancelarAssinatura') return await handleCancelarAssinatura(db, sessao, body);
 
     // Ações admin
     assertAdmin(sessao);
@@ -259,6 +263,8 @@ export async function onRequest(context) {
     if (action === 'excluirFeriado')        return await handleExcluirFeriado(db, body);
     if (action === 'preenchimentoRetroativo') return await handlePreenchimentoRetroativo(db, sessao, body);
     if (action === 'listarFuncionariosAdmin') return await handleListarFuncionariosAdmin(db);
+    if (action === 'excluirRegistroPonto')    return await handleExcluirRegistroPonto(db, sessao, body);
+    if (action === 'excluirAssinatura')       return await handleExcluirAssinatura(db, sessao, body);
 
     return jsonError('Ação não encontrada.', 404);
   } catch (err) {
@@ -1244,9 +1250,19 @@ async function handleAssinarFolha(db, sessao, body) {
   const tipo = String(body.tipo || 'colaborador');
   if (!mesAno) throw httpError(400, 'mesAno é obrigatório.');
   if (!['colaborador','gestor'].includes(tipo)) throw httpError(400, 'Tipo inválido.');
+
+  // Assinatura de gestor: apenas a Sra. Vitória Fonte é autorizada
+  if (tipo === 'gestor') {
+    const emailSessao = (sessao.email || '').toLowerCase().trim();
+    if (emailSessao !== GESTOR_EMAIL_AUTORIZADO) {
+      throw httpError(403, 'Apenas a gestora autorizada pode assinar como gestor.');
+    }
+  }
+
   const [ano, mes] = parseMesAno(mesAno);
   let usuarioId = sessao.usuario_id;
-  if (tipo === 'gestor' && sessao.perfil === 'admin' && body.usuario_id) {
+  // Gestor pode assinar a folha de qualquer funcionário
+  if (tipo === 'gestor' && body.usuario_id) {
     usuarioId = String(body.usuario_id);
   }
   const periodo = await db.prepare(
@@ -1276,6 +1292,84 @@ async function handleGetAssinaturas(db, sessao, body) {
     'SELECT tipo,assinado_em FROM fp_assinaturas WHERE periodo_id=?'
   ).bind(periodo.id).all();
   return json({ sucesso: true, assinaturas: rows.results || [] });
+}
+
+// ─── Cancelar Assinatura (própria) ──────────────────────────────────────────────
+async function handleCancelarAssinatura(db, sessao, body) {
+  const mesAno = String(body.mesAno || '');
+  const tipo   = String(body.tipo   || 'colaborador');
+  if (!mesAno) throw httpError(400, 'mesAno é obrigatório.');
+  if (!['colaborador','gestor'].includes(tipo)) throw httpError(400, 'Tipo inválido.');
+
+  // Apenas o próprio assinante pode cancelar a própria assinatura
+  if (tipo === 'gestor') {
+    const emailSessao = (sessao.email || '').toLowerCase().trim();
+    if (emailSessao !== GESTOR_EMAIL_AUTORIZADO) {
+      throw httpError(403, 'Apenas a gestora autorizada pode cancelar a assinatura de gestor.');
+    }
+  }
+
+  const [ano, mes] = parseMesAno(mesAno);
+  let usuarioId = sessao.usuario_id;
+  if (tipo === 'gestor' && body.usuario_id) usuarioId = String(body.usuario_id);
+
+  const periodo = await db.prepare(
+    'SELECT id FROM fp_periodos WHERE usuario_id=? AND ano=? AND mes=?'
+  ).bind(usuarioId, ano, mes).first();
+  if (!periodo) throw httpError(404, 'Período não encontrado.');
+
+  await db.prepare(
+    'DELETE FROM fp_assinaturas WHERE periodo_id=? AND tipo=?'
+  ).bind(periodo.id, tipo).run();
+
+  return json({ sucesso: true, mensagem: `Assinatura de ${tipo} cancelada.` });
+}
+
+// ─── Admin: Excluir Registro de Ponto ─────────────────────────────────────────
+async function handleExcluirRegistroPonto(db, sessao, body) {
+  assertAdmin(sessao);
+  const id = String(body.id || '').trim();
+  if (!id) throw httpError(400, 'ID do registro é obrigatório.');
+
+  const registro = await db.prepare(
+    'SELECT id, usuario_id, periodo_id, data FROM fp_registros_ponto WHERE id=?'
+  ).bind(id).first();
+  if (!registro) throw httpError(404, 'Registro não encontrado.');
+
+  await db.prepare('DELETE FROM fp_registros_ponto WHERE id=?').bind(id).run();
+
+  // Recalcular totais do período após exclusão
+  if (registro.periodo_id) {
+    const periodo = await db.prepare('SELECT * FROM fp_periodos WHERE id=?')
+      .bind(registro.periodo_id).first();
+    if (periodo) {
+      await recalcularPeriodo(db, registro.usuario_id, periodo.ano, periodo.mes, periodo);
+    }
+  }
+
+  return json({ sucesso: true, mensagem: `Registro do dia ${registro.data} excluído.` });
+}
+
+// ─── Admin: Excluir Assinatura ────────────────────────────────────────────────
+async function handleExcluirAssinatura(db, sessao, body) {
+  assertAdmin(sessao);
+  const mesAno    = String(body.mesAno    || '');
+  const tipo      = String(body.tipo      || '');
+  const usuarioId = String(body.usuario_id || '');
+  if (!mesAno || !tipo || !usuarioId) throw httpError(400, 'mesAno, tipo e usuario_id são obrigatórios.');
+  if (!['colaborador','gestor'].includes(tipo)) throw httpError(400, 'Tipo inválido.');
+
+  const [ano, mes] = parseMesAno(mesAno);
+  const periodo = await db.prepare(
+    'SELECT id FROM fp_periodos WHERE usuario_id=? AND ano=? AND mes=?'
+  ).bind(usuarioId, ano, mes).first();
+  if (!periodo) throw httpError(404, 'Período não encontrado.');
+
+  await db.prepare(
+    'DELETE FROM fp_assinaturas WHERE periodo_id=? AND tipo=?'
+  ).bind(periodo.id, tipo).run();
+
+  return json({ sucesso: true, mensagem: `Assinatura de ${tipo} removida pelo administrador.` });
 }
 
 // ─── Admin: Preenchimento Retroativo ───────────────────────────────────────────────

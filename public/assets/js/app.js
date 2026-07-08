@@ -10,7 +10,9 @@
     get token()  { return sessionStorage.getItem('fp_token'); },
     get perfil() { return sessionStorage.getItem('fp_perfil'); },
     get nome()   { return sessionStorage.getItem('fp_nome'); },
+    get email()  { return sessionStorage.getItem('fp_email') || ''; },
     isAdmin()    { return this.perfil === 'admin'; },
+    isGestor()   { return this.email.toLowerCase() === 'vitoria.fonte@newelevadores.com'; },
     isLogado()   { return !!this.token; },
     logout()     {
       if (this.token) {

@@ -799,3 +799,35 @@ td.negative, .negative { color: var(--danger); }
   text-underline-offset: 2px;
 }
 .btn-link:hover { color: var(--brand); }
+
+/* ── Botão cancelar assinatura (admin) ──────────────────────────────────────── */
+.btn-cancelar-ass {
+  margin-top: 6px;
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+  font-size: .72rem;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background .15s;
+}
+.btn-cancelar-ass:hover { background: #fee2e2; }
+
+/* ── Botão excluir registro por linha (admin) ───────────────────────────────── */
+.btn-excluir-reg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 4px;
+  padding: 3px 5px;
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: .72rem;
+  vertical-align: middle;
+  transition: background .15s;
+}
+.btn-excluir-reg:hover { background: #fee2e2; }
