@@ -6,8 +6,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "sistema-new",
-      "database_id": "5eb7fdb4-27e9-4a72-9d0e-1dd8a2f3cc42"
+      "database_name": "folha-de-ponto-db",
+      "database_id": "aa9d84e1-3ecc-42f3-8392-44ea00c922a9"
     }
   ],
   // Variaveis de ambiente
