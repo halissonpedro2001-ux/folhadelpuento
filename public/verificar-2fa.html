@@ -135,7 +135,8 @@
         sessionStorage.setItem('fp_perfil', data.perfil);
         sessionStorage.setItem('fp_nome', data.nome || '');
         sessionStorage.setItem('fp_email', emailTemp);
-        window.location.replace('/');
+        // Admin vai direto ao painel de gestão
+        window.location.replace(data.perfil === 'admin' ? '/admin.html' : '/');
 
       } catch (err) {
         alerta.textContent = 'Erro de conexão. Tente novamente.';

@@ -35,10 +35,8 @@
         <span>Folha de Ponto</span>
       </a>
       <nav>
-        <a href="/" id="navDashboard">Dashboard</a>
-        <a href="/ponto.html" id="navPonto">Meu Ponto</a>
+        <a href="/admin.html" class="active" id="navAdmin">Painel de Gestão</a>
         <a href="/configurar-2fa.html" id="navConfig">Segurança</a>
-        <a href="/admin.html" class="active" id="navAdmin">Administração</a>
       </nav>
       <div class="header-user">
         <strong id="headerNome">—</strong>
@@ -47,17 +45,17 @@
     </header>
 
     <main class="app-main">
-      <h1 class="mb-24">Painel de Administração</h1>
+      <h1 class="mb-24">Painel de Gestão</h1>
 
       <!-- Tabs -->
       <div class="tabs">
-        <button class="tab-btn active" data-tab="funcionarios">Funcionários</button>
-        <button class="tab-btn" data-tab="pontos">Pontos do Mês</button>
+        <button class="tab-btn active" data-tab="colaboradores">Colaboradores</button>
+        <button class="tab-btn" data-tab="funcionarios">Cadastro</button>
         <button class="tab-btn" data-tab="retroativo">Preenchimento Retroativo</button>
       </div>
 
       <!-- Tab: Funcionários -->
-      <div class="tab-panel active" id="tab-funcionarios">
+      <div class="tab-panel" id="tab-funcionarios">
         <div class="flex-center gap-8 mb-16" style="justify-content: space-between; flex-wrap: wrap;">
           <h2>Funcionários cadastrados</h2>
           <button class="btn btn-primary btn-sm" id="btnNovoFunc">+ Novo Funcionário</button>
@@ -135,35 +133,40 @@
         </div>
       </div>
 
-      <!-- Tab: Pontos -->
-      <div class="tab-panel" id="tab-pontos">
+      <!-- Tab: Colaboradores (visão consolidada) -->
+      <div class="tab-panel active" id="tab-colaboradores">
         <div class="flex-center gap-8 mb-16" style="justify-content: space-between; flex-wrap: wrap;">
-          <h2>Registros de ponto</h2>
+          <div>
+            <h2>Banco de Horas — Todos os Colaboradores</h2>
+            <p style="font-size:.82rem; color:#64748b; margin-top:2px;">Selecione o mês e visualize o resumo de cada colaborador</p>
+          </div>
           <div class="mes-selector">
-            <label for="selectMesAdmin" style="font-size: .8rem; font-weight: 600; color: var(--muted);">Mês:</label>
-            <select id="selectMesAdmin"></select>
+            <label for="selectMesColab" style="font-size: .8rem; font-weight: 600; color: var(--muted);">Mês:</label>
+            <select id="selectMesColab"></select>
           </div>
         </div>
 
+        <div id="alertaColab" class="alert hidden" style="margin-bottom:12px;"></div>
+
         <div class="card" style="padding: 0; overflow: hidden;">
           <div style="overflow-x: auto;">
-            <table class="func-table" id="tabelaPontos">
+            <table class="func-table" id="tabelaColab">
               <thead>
                 <tr>
-                  <th>Funcionário</th>
-                  <th>Data</th>
-                  <th>Tipo</th>
-                  <th>Entrada</th>
-                  <th>Saída Alm.</th>
-                  <th>Retorno</th>
-                  <th>Saída</th>
-                  <th>Ocorrência</th>
-                  <th>H. Trab.</th>
-                  <th>Saldo</th>
+                  <th>Colaborador</th>
+                  <th>Cargo / Setor</th>
+                  <th>H. Previstas</th>
+                  <th>H. Trabalhadas</th>
+                  <th>Crédito BH</th>
+                  <th>Débito BH</th>
+                  <th>Saldo do Mês</th>
+                  <th>Saldo Acumulado</th>
+                  <th>Status</th>
+                  <th>Ações</th>
                 </tr>
               </thead>
-              <tbody id="corpoPontos">
-                <tr><td colspan="10" style="text-align:center; padding: 32px; color: var(--muted);">Selecione o mês</td></tr>
+              <tbody id="corpoColab">
+                <tr><td colspan="10" style="text-align:center; padding: 32px; color: var(--muted);">Carregando...</td></tr>
               </tbody>
             </table>
           </div>
@@ -190,8 +193,61 @@
         document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
         btn.classList.add('active');
         document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
-        if (btn.dataset.tab === 'pontos') carregarPontos();
+        if (btn.dataset.tab === 'colaboradores') carregarColaboradores();
+        if (btn.dataset.tab === 'retroativo') carregarSelectFuncionarios();
+        if (btn.dataset.tab === 'funcionarios') carregarFuncionarios();
       });
+    });
+
+    // ── Colaboradores (visão consolidada) ────────────────────────────────────
+    let mesColab = mesAnoAtual();
+
+    async function carregarColaboradores() {
+      document.getElementById('corpoColab').innerHTML =
+        '<tr><td colspan="10" style="text-align:center; padding: 32px; color: var(--muted);">Carregando...</td></tr>';
+      try {
+        const data = await api('listarTodosPeriodos', { mesAno: mesColab });
+        const periodos = data.periodos || [];
+        if (!periodos.length) {
+          document.getElementById('corpoColab').innerHTML =
+            '<tr><td colspan="10" style="text-align:center; padding: 32px; color: var(--muted);">Nenhum colaborador com registro neste mês.</td></tr>';
+          return;
+        }
+        document.getElementById('corpoColab').innerHTML = periodos.map(p => {
+          const saldoMes = (p.saldo_periodo || 0);
+          const saldoAcum = (p.saldo_acumulado || 0);
+          const statusBadge = p.status === 'fechado'
+            ? '<span class="badge danger">Fechado</span>'
+            : '<span class="badge ok">Aberto</span>';
+          return `
+            <tr>
+              <td><strong>${p.nome || '—'}</strong><br><small style="color:var(--muted)">${p.email || ''}</small></td>
+              <td>${p.cargo || '—'}<br><small style="color:var(--muted)">${p.setor || ''}</small></td>
+              <td>${UI.formatHoras(p.horas_previstas)}</td>
+              <td>${UI.formatHoras(p.horas_trabalhadas)}</td>
+              <td>${UI.formatSaldo(p.credito_bh)}</td>
+              <td>${UI.formatSaldo(p.debito_bh)}</td>
+              <td>${UI.formatSaldo(saldoMes)}</td>
+              <td>${UI.formatSaldo(saldoAcum)}</td>
+              <td>${statusBadge}</td>
+              <td>
+                <a href="/ponto.html?usuario_id=${p.usuario_id}&mes=${mesColab}"
+                   class="btn btn-secondary btn-sm">Ver Folha</a>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        document.getElementById('corpoColab').innerHTML =
+          `<tr><td colspan="10" style="text-align:center; padding: 24px; color: var(--danger);">${err.message}</td></tr>`;
+      }
+    }
+
+    const selectMesColab = document.getElementById('selectMesColab');
+    gerarOpcoesMeses(selectMesColab, mesColab);
+    selectMesColab.addEventListener('change', () => {
+      mesColab = selectMesColab.value;
+      carregarColaboradores();
     });
 
     // ── Funcionários ──────────────────────────────────────────────────────────
@@ -222,6 +278,7 @@
           <td>${f.totp_ativo ? '<span class="badge ok">Ativo</span>' : '<span class="badge danger">Inativo</span>'}</td>
           <td>
             <div class="row-actions">
+              <a href="/ponto.html?usuario_id=${f.id}" class="btn btn-secondary btn-sm">Ver Folha</a>
               <button class="btn btn-secondary btn-sm" onclick="editarFuncionario('${f.id}')">Editar</button>
               <button class="btn btn-sm" style="background: var(--warn-bg); color: var(--warn);" onclick="resetarSenha('${f.id}', '${f.nome.replace(/'/g, "\\'")}')">Reset Senha</button>
               ${f.situacao === 'ATIVO' ? `<button class="btn btn-danger btn-sm" onclick="inativarFuncionario('${f.id}', '${f.nome.replace(/'/g, "\\'")}')">Inativar</button>` : ''}
@@ -511,17 +568,10 @@
       }
     };
 
-    // Carregar select ao abrir aba retroativo
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        if (btn.dataset.tab === 'retroativo') carregarSelectFuncionarios();
-      });
-    });
-
     // Inicializar
     document.getElementById('loadingPage').classList.add('hidden');
     document.getElementById('appWrap').classList.remove('hidden');
-    carregarFuncionarios();
+    carregarColaboradores(); // Aba padrão do admin: visão consolidada de todos os colaboradores
   </script>
 </body>
 </html>

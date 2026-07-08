@@ -316,7 +316,8 @@
         sessionStorage.setItem('fp_perfil', data.perfil);
         sessionStorage.setItem('fp_nome',   data.nome || '');
         sessionStorage.setItem('fp_email',  email);
-        window.location.replace('/');
+        // Admin vai direto ao painel de gestão; funcionários vão ao dashboard pessoal
+        window.location.replace(data.perfil === 'admin' ? '/admin.html' : '/');
 
       } catch {
         mostrarAlerta('alertLogin', 'Erro de conexão. Verifique sua internet.');
