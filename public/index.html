@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — Folha de Ponto NEW Elevadores</title>
+  <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+  <div id="loadingPage" class="loading-page">
+    <div class="spinner-lg"></div>
+    <p style="color: var(--muted)">Carregando...</p>
+  </div>
+
+  <div id="appWrap" class="app-wrap hidden">
+    <!-- Header -->
+    <header class="app-header">
+      <a href="/" class="logo">
+        <div class="logo-mark">N</div>
+        <span>Folha de Ponto</span>
+      </a>
+      <nav>
+        <a href="/" class="active" id="navDashboard">Dashboard</a>
+        <a href="/ponto.html" id="navPonto">Meu Ponto</a>
+        <a href="/configurar-2fa.html" id="navConfig">Segurança</a>
+        <a href="/admin.html" id="navAdmin" class="hidden">Administração</a>
+      </nav>
+      <div class="header-user">
+        <strong id="headerNome">—</strong>
+        <button class="btn-logout" id="btnLogout">Sair</button>
+      </div>
+    </header>
+
+    <!-- Main -->
+    <main class="app-main">
+      <div class="flex-center gap-12 mb-24" style="justify-content: space-between; flex-wrap: wrap;">
+        <div>
+          <h1>Dashboard</h1>
+          <p id="subtitulo" style="margin-top: 4px;">Resumo do banco de horas</p>
+        </div>
+        <div class="mes-selector">
+          <label for="selectMes" style="font-size: .8rem; font-weight: 600; color: var(--muted);">Mês:</label>
+          <select id="selectMes"></select>
+        </div>
+      </div>
+
+      <!-- Métricas -->
+      <div class="metrics-grid" id="metricsGrid">
+        <div class="metric-card">
+          <div class="label">Dias Úteis</div>
+          <div class="value neutral" id="mDiasUteis">—</div>
+          <div class="sub">no mês</div>
+        </div>
+        <div class="metric-card">
+          <div class="label">Horas Previstas</div>
+          <div class="value neutral" id="mHorasPrevistas">—</div>
+          <div class="sub">carga do mês</div>
+        </div>
+        <div class="metric-card">
+          <div class="label">Horas Trabalhadas</div>
+          <div class="value" id="mHorasTrabalhadas">—</div>
+          <div class="sub">registradas</div>
+        </div>
+        <div class="metric-card">
+          <div class="label">Crédito BH</div>
+          <div class="value positive" id="mCredito">—</div>
+          <div class="sub">horas extras</div>
+        </div>
+        <div class="metric-card">
+          <div class="label">Débito BH</div>
+          <div class="value negative" id="mDebito">—</div>
+          <div class="sub">horas devidas</div>
+        </div>
+        <div class="metric-card">
+          <div class="label">Saldo do Mês</div>
+          <div class="value" id="mSaldoMes">—</div>
+          <div class="sub">crédito − débito</div>
+        </div>
+        <div class="metric-card">
+          <div class="label">Saldo Anterior</div>
+          <div class="value neutral" id="mSaldoAnterior">—</div>
+          <div class="sub">acumulado</div>
+        </div>
+        <div class="metric-card">
+          <div class="label">Saldo Final</div>
+          <div class="value" id="mSaldoFinal" style="font-size: 2rem;">—</div>
+          <div class="sub">banco de horas</div>
+        </div>
+      </div>
+
+      <!-- Card de perfil -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <div class="card-icon">👤</div>
+            <h2>Dados do Colaborador</h2>
+          </div>
+          <a href="/ponto.html" class="btn btn-primary btn-sm">Ver Folha de Ponto →</a>
+        </div>
+        <div class="form-grid" id="perfilGrid">
+          <div class="field">
+            <label>Colaborador</label>
+            <div id="pNome" style="padding: 9px 0; font-weight: 600;">—</div>
+          </div>
+          <div class="field">
+            <label>Cargo</label>
+            <div id="pCargo" style="padding: 9px 0;">—</div>
+          </div>
+          <div class="field">
+            <label>Setor</label>
+            <div id="pSetor" style="padding: 9px 0;">—</div>
+          </div>
+          <div class="field">
+            <label>Gestor</label>
+            <div id="pGestor" style="padding: 9px 0;">—</div>
+          </div>
+          <div class="field">
+            <label>Jornada Padrão</label>
+            <div id="pJornada" style="padding: 9px 0;">—</div>
+          </div>
+          <div class="field">
+            <label>Unidade</label>
+            <div id="pUnidade" style="padding: 9px 0;">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Aviso 2FA -->
+      <div id="aviso2fa" class="alert alert-warn mt-16 hidden">
+        🔐 <strong>Segurança:</strong> Você ainda não ativou a verificação em duas etapas.
+        <a href="/configurar-2fa.html" style="color: var(--warn); font-weight: 600; margin-left: 8px;">Configurar agora →</a>
+      </div>
+    </main>
+  </div>
+
+  <script src="/assets/js/app.js"></script>
+  <script>
+    const { Sessao, api, UI, formatarMesAno, gerarOpcoesMeses, mesAnoAtual } = FP;
+
+    if (!Sessao.isLogado()) {
+      window.location.replace('/login.html');
+    }
+
+    // Configurar header
+    document.getElementById('headerNome').textContent = Sessao.nome || 'Usuário';
+    document.getElementById('btnLogout').onclick = () => Sessao.logout();
+
+    // Mostrar link admin se for admin
+    if (Sessao.isAdmin()) {
+      document.getElementById('navAdmin').classList.remove('hidden');
+    }
+
+    let mesAtual = mesAnoAtual();
+
+    async function carregarDashboard() {
+      try {
+        const data = await api('getDashboard', { mesAno: mesAtual });
+        const r = data.resumo;
+        const u = data.usuario;
+
+        document.getElementById('subtitulo').textContent =
+          `${u.nome} · ${formatarMesAno(mesAtual)}`;
+
+        // Métricas
+        document.getElementById('mDiasUteis').textContent = r.dias_uteis;
+        document.getElementById('mHorasPrevistas').textContent = UI.formatHoras(r.horas_previstas);
+        document.getElementById('mHorasTrabalhadas').textContent = UI.formatHoras(r.horas_trabalhadas);
+        document.getElementById('mCredito').textContent = UI.formatHoras(r.credito);
+        document.getElementById('mDebito').textContent = UI.formatHoras(r.debito);
+
+        const elSaldoMes = document.getElementById('mSaldoMes');
+        elSaldoMes.innerHTML = UI.formatSaldo(r.saldo_mes);
+
+        document.getElementById('mSaldoAnterior').textContent = UI.formatHoras(r.saldo_anterior);
+
+        const elSaldoFinal = document.getElementById('mSaldoFinal');
+        elSaldoFinal.innerHTML = UI.formatSaldo(r.saldo_final);
+
+        // Perfil
+        document.getElementById('pNome').textContent = u.nome || '—';
+        document.getElementById('pCargo').textContent = u.cargo || '—';
+        document.getElementById('pSetor').textContent = u.setor || '—';
+        document.getElementById('pGestor').textContent = u.gestor || '—';
+        document.getElementById('pJornada').textContent = u.jornada_padrao || '—';
+        document.getElementById('pUnidade').textContent = u.unidade || '—';
+
+        // Aviso 2FA
+        if (!u.totp_ativo) {
+          document.getElementById('aviso2fa').classList.remove('hidden');
+        }
+
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // Inicializar
+    const selectMes = document.getElementById('selectMes');
+    gerarOpcoesMeses(selectMes, mesAtual);
+    selectMes.addEventListener('change', () => {
+      mesAtual = selectMes.value;
+      carregarDashboard();
+    });
+
+    // Mostrar app
+    document.getElementById('loadingPage').classList.add('hidden');
+    document.getElementById('appWrap').classList.remove('hidden');
+
+    carregarDashboard();
+  </script>
+</body>
+</html>

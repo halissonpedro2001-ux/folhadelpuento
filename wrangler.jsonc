@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "folha-de-ponto",
+  "compatibility_date": "2026-07-08",
+  "pages_build_output_dir": "public",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "sistema-new",
+      "database_id": "5eb7fdb4-27e9-4a72-9d0e-1dd8a2f3cc42"
+    }
+  ],
+  // Variaveis de ambiente
+  // ADMIN_EMAIL: e-mail do administrador principal
+  // SESSION_SECRET: segredo para assinar tokens de sessao (gerar string aleatoria de 64 chars)
+  "vars": {
+    "ADMIN_EMAIL": "halissonpedro2001@gmail.com",
+    "APP_NAME": "Folha de Ponto — NEW Elevadores"
+  }
+}

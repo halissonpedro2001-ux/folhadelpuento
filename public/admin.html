@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Administração — Folha de Ponto NEW Elevadores</title>
+  <link rel="stylesheet" href="/assets/css/app.css">
+  <style>
+    .func-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    .func-table th {
+      background: var(--brand); color: rgba(255,255,255,.9);
+      font-size: .75rem; text-transform: uppercase; letter-spacing: .04em;
+      padding: 10px 12px; text-align: left; font-weight: 600;
+    }
+    .func-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+    .func-table tr:hover td { background: #f8fafc; }
+    .row-actions { display: flex; gap: 6px; }
+    .senha-temp {
+      font-family: monospace; background: var(--brand); color: #fff;
+      padding: 4px 10px; border-radius: 6px; font-size: .9rem;
+      user-select: all; letter-spacing: .05em;
+    }
+  </style>
+</head>
+<body>
+  <div id="loadingPage" class="loading-page">
+    <div class="spinner-lg"></div>
+  </div>
+
+  <div id="appWrap" class="app-wrap hidden">
+    <header class="app-header">
+      <a href="/" class="logo">
+        <div class="logo-mark">N</div>
+        <span>Folha de Ponto</span>
+      </a>
+      <nav>
+        <a href="/" id="navDashboard">Dashboard</a>
+        <a href="/ponto.html" id="navPonto">Meu Ponto</a>
+        <a href="/configurar-2fa.html" id="navConfig">Segurança</a>
+        <a href="/admin.html" class="active" id="navAdmin">Administração</a>
+      </nav>
+      <div class="header-user">
+        <strong id="headerNome">—</strong>
+        <button class="btn-logout" id="btnLogout">Sair</button>
+      </div>
+    </header>
+
+    <main class="app-main">
+      <h1 class="mb-24">Painel de Administração</h1>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="funcionarios">Funcionários</button>
+        <button class="tab-btn" data-tab="pontos">Pontos do Mês</button>
+      </div>
+
+      <!-- Tab: Funcionários -->
+      <div class="tab-panel active" id="tab-funcionarios">
+        <div class="flex-center gap-8 mb-16" style="justify-content: space-between; flex-wrap: wrap;">
+          <h2>Funcionários cadastrados</h2>
+          <button class="btn btn-primary btn-sm" id="btnNovoFunc">+ Novo Funcionário</button>
+        </div>
+
+        <div id="alertaFunc" class="alert hidden"></div>
+
+        <div class="card" style="padding: 0; overflow: hidden;">
+          <div style="overflow-x: auto;">
+            <table class="func-table">
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Email</th>
+                  <th>Cargo</th>
+                  <th>Setor</th>
+                  <th>Perfil</th>
+                  <th>Situação</th>
+                  <th>2FA</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tabelaFuncionarios">
+                <tr><td colspan="8" style="text-align:center; padding: 32px; color: var(--muted);">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Pontos -->
+      <div class="tab-panel" id="tab-pontos">
+        <div class="flex-center gap-8 mb-16" style="justify-content: space-between; flex-wrap: wrap;">
+          <h2>Registros de ponto</h2>
+          <div class="mes-selector">
+            <label for="selectMesAdmin" style="font-size: .8rem; font-weight: 600; color: var(--muted);">Mês:</label>
+            <select id="selectMesAdmin"></select>
+          </div>
+        </div>
+
+        <div class="card" style="padding: 0; overflow: hidden;">
+          <div style="overflow-x: auto;">
+            <table class="func-table" id="tabelaPontos">
+              <thead>
+                <tr>
+                  <th>Funcionário</th>
+                  <th>Data</th>
+                  <th>Tipo</th>
+                  <th>Entrada</th>
+                  <th>Saída Alm.</th>
+                  <th>Retorno</th>
+                  <th>Saída</th>
+                  <th>Ocorrência</th>
+                  <th>H. Trab.</th>
+                  <th>Saldo</th>
+                </tr>
+              </thead>
+              <tbody id="corpoPontos">
+                <tr><td colspan="10" style="text-align:center; padding: 32px; color: var(--muted);">Selecione o mês</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/assets/js/app.js"></script>
+  <script>
+    const { Sessao, api, UI, formatarMesAno, gerarOpcoesMeses, mesAnoAtual } = FP;
+
+    if (!Sessao.isLogado()) window.location.replace('/login.html');
+    if (!Sessao.isAdmin()) window.location.replace('/');
+
+    document.getElementById('headerNome').textContent = Sessao.nome || 'Admin';
+    document.getElementById('btnLogout').onclick = () => Sessao.logout();
+
+    // Tabs
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+        if (btn.dataset.tab === 'pontos') carregarPontos();
+      });
+    });
+
+    // ── Funcionários ──────────────────────────────────────────────────────────
+    async function carregarFuncionarios() {
+      try {
+        const data = await api('listarFuncionarios');
+        renderFuncionarios(data.funcionarios || []);
+      } catch (err) {
+        document.getElementById('tabelaFuncionarios').innerHTML =
+          `<tr><td colspan="8" style="text-align:center; padding: 24px; color: var(--danger);">${err.message}</td></tr>`;
+      }
+    }
+
+    function renderFuncionarios(lista) {
+      const tbody = document.getElementById('tabelaFuncionarios');
+      if (!lista.length) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 32px; color: var(--muted);">Nenhum funcionário cadastrado.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = lista.map(f => `
+        <tr>
+          <td><strong>${f.nome}</strong><br><small style="color:var(--muted)">${f.matricula ? 'Mat. ' + f.matricula : ''}</small></td>
+          <td>${f.email}</td>
+          <td>${f.cargo || '—'}</td>
+          <td>${f.setor || '—'}</td>
+          <td><span class="badge ${f.perfil === 'admin' ? 'info' : 'fds'}">${f.perfil}</span></td>
+          <td><span class="badge ${f.situacao === 'ATIVO' ? 'ok' : 'danger'}">${f.situacao}</span></td>
+          <td>${f.totp_ativo ? '<span class="badge ok">✓ Ativo</span>' : '<span class="badge danger">✗ Inativo</span>'}</td>
+          <td>
+            <div class="row-actions">
+              <button class="btn btn-secondary btn-sm" onclick="editarFuncionario('${f.id}')">Editar</button>
+              <button class="btn btn-sm" style="background: var(--warn-bg); color: var(--warn);" onclick="resetarSenha('${f.id}', '${f.nome.replace(/'/g, "\\'")}')">Reset Senha</button>
+              ${f.situacao === 'ATIVO' ? `<button class="btn btn-danger btn-sm" onclick="inativarFuncionario('${f.id}', '${f.nome.replace(/'/g, "\\'")}')">Inativar</button>` : ''}
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    const CAMPOS_FUNC = [
+      { key: 'nome', label: 'Nome completo', required: true },
+      { key: 'email', label: 'Email', type: 'email', required: true },
+      { key: 'cargo', label: 'Cargo' },
+      { key: 'setor', label: 'Setor' },
+      { key: 'gestor', label: 'Gestor' },
+      { key: 'unidade', label: 'Unidade' },
+      { key: 'matricula', label: 'Matrícula' },
+      { key: 'jornada_padrao', label: 'Jornada padrão' },
+      { key: 'carga_diaria', label: 'Carga diária (h)', type: 'number' },
+      { key: 'saldo_anterior', label: 'Saldo anterior (h)', type: 'number' },
+      { key: 'perfil', label: 'Perfil', type: 'select', options: ['funcionario', 'admin'] },
+      { key: 'situacao', label: 'Situação', type: 'select', options: ['ATIVO', 'INATIVO', 'AFASTADO', 'FERIAS'] }
+    ];
+
+    function abrirFormFuncionario(dados = {}) {
+      const isNovo = !dados.id;
+      const form = document.createElement('div');
+      form.className = 'form-grid';
+
+      for (const c of CAMPOS_FUNC) {
+        const field = document.createElement('div');
+        field.className = 'field';
+        const label = document.createElement('label');
+        label.textContent = c.label + (c.required ? ' *' : '');
+        label.setAttribute('for', 'fc_' + c.key);
+        field.appendChild(label);
+
+        let input;
+        if (c.type === 'select') {
+          input = document.createElement('select');
+          input.id = 'fc_' + c.key;
+          for (const o of c.options) {
+            const opt = document.createElement('option');
+            opt.value = o; opt.textContent = o;
+            if (String(dados[c.key]) === o) opt.selected = true;
+            input.appendChild(opt);
+          }
+        } else {
+          input = document.createElement('input');
+          input.type = c.type || 'text';
+          input.id = 'fc_' + c.key;
+          input.value = dados[c.key] != null ? dados[c.key] : '';
+          if (c.required) input.required = true;
+        }
+        field.appendChild(input);
+        form.appendChild(field);
+      }
+
+      if (isNovo) {
+        const f = document.createElement('div');
+        f.className = 'field';
+        const l = document.createElement('label'); l.textContent = 'Senha inicial';
+        const i = document.createElement('input'); i.type = 'text'; i.id = 'fc_senha';
+        i.placeholder = 'Deixe em branco para gerar automaticamente';
+        f.appendChild(l); f.appendChild(i);
+        form.appendChild(f);
+      }
+
+      const alerta = document.createElement('div');
+      alerta.className = 'alert hidden';
+      form.appendChild(alerta);
+
+      const modal = UI.modal({
+        title: isNovo ? 'Novo Funcionário' : 'Editar Funcionário',
+        body: form,
+        footer: [
+          { label: 'Cancelar', class: 'btn-secondary' },
+          {
+            label: isNovo ? 'Criar Funcionário' : 'Salvar',
+            class: 'btn-primary',
+            action: async (overlay) => {
+              const payload = { id: dados.id };
+              for (const c of CAMPOS_FUNC) {
+                const el = document.getElementById('fc_' + c.key);
+                payload[c.key] = el ? el.value : '';
+              }
+              if (isNovo) {
+                const senhaEl = document.getElementById('fc_senha');
+                if (senhaEl && senhaEl.value) payload.senha = senhaEl.value;
+              }
+
+              try {
+                const res = await api('salvarFuncionario', payload);
+                if (isNovo && res.senhaTemp) {
+                  overlay.remove();
+                  const msg = document.createElement('div');
+                  msg.innerHTML = `
+                    <p style="margin-bottom: 12px;">Funcionário criado com sucesso!</p>
+                    <p style="margin-bottom: 8px; font-size: .875rem; color: var(--muted);">
+                      Compartilhe a senha temporária com o funcionário:
+                    </p>
+                    <div class="senha-temp">${res.senhaTemp}</div>
+                    <p class="text-small text-muted mt-8">
+                      O funcionário deverá alterar a senha no primeiro acesso.
+                    </p>
+                  `;
+                  UI.modal({ title: 'Funcionário Criado', body: msg,
+                    footer: [{ label: 'Fechar', class: 'btn-primary' }] });
+                } else {
+                  overlay.remove();
+                }
+                carregarFuncionarios();
+              } catch (err) {
+                UI.showAlert(alerta, err.message);
+              }
+            }
+          }
+        ]
+      });
+    }
+
+    document.getElementById('btnNovoFunc').onclick = () => abrirFormFuncionario();
+
+    window.editarFuncionario = async (id) => {
+      try {
+        const data = await api('listarFuncionarios');
+        const func = (data.funcionarios || []).find(f => f.id === id);
+        if (func) abrirFormFuncionario(func);
+      } catch (err) {
+        alert('Erro: ' + err.message);
+      }
+    };
+
+    window.inativarFuncionario = async (id, nome) => {
+      const ok = await UI.confirm(`Deseja inativar o funcionário "${nome}"?`);
+      if (!ok) return;
+      try {
+        await api('inativarFuncionario', { id });
+        carregarFuncionarios();
+      } catch (err) {
+        alert('Erro: ' + err.message);
+      }
+    };
+
+    window.resetarSenha = async (id, nome) => {
+      const ok = await UI.confirm(`Redefinir a senha de "${nome}"? O 2FA também será desativado.`);
+      if (!ok) return;
+      try {
+        const res = await api('resetarSenha', { id });
+        const msg = document.createElement('div');
+        msg.innerHTML = `
+          <p style="margin-bottom: 12px;">Senha redefinida com sucesso!</p>
+          <p style="font-size: .875rem; color: var(--muted); margin-bottom: 8px;">Nova senha temporária:</p>
+          <div class="senha-temp">${res.novaSenha}</div>
+        `;
+        UI.modal({ title: 'Senha Redefinida', body: msg,
+          footer: [{ label: 'Fechar', class: 'btn-primary' }] });
+      } catch (err) {
+        alert('Erro: ' + err.message);
+      }
+    };
+
+    // ── Pontos ────────────────────────────────────────────────────────────────
+    let mesAdmin = mesAnoAtual();
+
+    async function carregarPontos() {
+      document.getElementById('corpoPontos').innerHTML =
+        '<tr><td colspan="10" style="text-align:center; padding: 32px; color: var(--muted);">Carregando...</td></tr>';
+      try {
+        const data = await api('listarTodosPontos', { mesAno: mesAdmin });
+        const registros = data.registros || [];
+        if (!registros.length) {
+          document.getElementById('corpoPontos').innerHTML =
+            '<tr><td colspan="10" style="text-align:center; padding: 32px; color: var(--muted);">Nenhum registro neste mês.</td></tr>';
+          return;
+        }
+        document.getElementById('corpoPontos').innerHTML = registros.map(r => {
+          const [a, m, d] = r.data.split('-');
+          return `
+            <tr>
+              <td><strong>${r.nome}</strong><br><small style="color:var(--muted)">${r.setor || ''}</small></td>
+              <td>${d}/${m}/${a}</td>
+              <td>${UI.badgeTipoDia(r.tipo_dia || 'Dia útil')}</td>
+              <td>${r.entrada || '—'}</td>
+              <td>${r.saida_almoco || '—'}</td>
+              <td>${r.retorno_almoco || '—'}</td>
+              <td>${r.saida || '—'}</td>
+              <td>${r.ocorrencia || '—'}</td>
+              <td>${UI.formatHoras(r.horas_trabalhadas)}</td>
+              <td>${UI.formatSaldo(r.saldo_dia)}</td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        document.getElementById('corpoPontos').innerHTML =
+          `<tr><td colspan="10" style="text-align:center; padding: 24px; color: var(--danger);">${err.message}</td></tr>`;
+      }
+    }
+
+    const selectMesAdmin = document.getElementById('selectMesAdmin');
+    gerarOpcoesMeses(selectMesAdmin, mesAdmin);
+    selectMesAdmin.addEventListener('change', () => {
+      mesAdmin = selectMesAdmin.value;
+      carregarPontos();
+    });
+
+    // Inicializar
+    document.getElementById('loadingPage').classList.add('hidden');
+    document.getElementById('appWrap').classList.remove('hidden');
+    carregarFuncionarios();
+  </script>
+</body>
+</html>

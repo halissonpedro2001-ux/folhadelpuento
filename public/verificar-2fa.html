@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verificação em 2 Etapas — Folha de Ponto NEW Elevadores</title>
+  <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+  <div class="login-page">
+    <div class="login-box">
+      <div class="login-logo">
+        <div class="mark">N</div>
+        <div>
+          <div class="title">NEW Elevadores</div>
+          <div class="subtitle">Verificação em Duas Etapas</div>
+        </div>
+      </div>
+
+      <h2>Verificação de segurança</h2>
+      <p id="descricao">Abra o aplicativo autenticador e insira o código de 6 dígitos.</p>
+
+      <div id="alerta" class="alert alert-error hidden"></div>
+
+      <form id="form2fa">
+        <div class="totp-digits" id="digitInputs">
+          <input type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" class="digit" autofocus>
+          <input type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" class="digit">
+          <input type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" class="digit">
+          <input type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" class="digit">
+          <input type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" class="digit">
+          <input type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" class="digit">
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-full" id="btnVerificar" disabled>
+          Verificar código
+        </button>
+      </form>
+
+      <p class="text-center mt-16">
+        <a href="/login.html" style="color: var(--accent); font-size: .875rem;">
+          ← Voltar ao login
+        </a>
+      </p>
+    </div>
+  </div>
+
+  <script>
+    const tokenTemp = sessionStorage.getItem('fp_token_temp');
+    const nome = sessionStorage.getItem('fp_nome_temp');
+
+    if (!tokenTemp) {
+      window.location.replace('/login.html');
+    }
+
+    if (nome) {
+      document.getElementById('descricao').textContent =
+        `Olá, ${nome}. Abra o aplicativo autenticador e insira o código de 6 dígitos.`;
+    }
+
+    const digits = Array.from(document.querySelectorAll('.digit'));
+    const btn = document.getElementById('btnVerificar');
+    const alerta = document.getElementById('alerta');
+
+    function getCodigo() {
+      return digits.map(d => d.value).join('');
+    }
+
+    function updateBtn() {
+      btn.disabled = getCodigo().length < 6;
+    }
+
+    digits.forEach((input, idx) => {
+      input.addEventListener('input', (e) => {
+        const v = e.target.value.replace(/\D/g, '');
+        e.target.value = v ? v[0] : '';
+        if (v && idx < 5) digits[idx + 1].focus();
+        updateBtn();
+        if (getCodigo().length === 6) document.getElementById('form2fa').requestSubmit();
+      });
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace' && !input.value && idx > 0) {
+          digits[idx - 1].focus();
+          digits[idx - 1].value = '';
+          updateBtn();
+        }
+        if (e.key === 'ArrowLeft' && idx > 0) digits[idx - 1].focus();
+        if (e.key === 'ArrowRight' && idx < 5) digits[idx + 1].focus();
+      });
+
+      input.addEventListener('paste', (e) => {
+        e.preventDefault();
+        const text = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
+        text.split('').slice(0, 6).forEach((c, i) => {
+          if (digits[i]) digits[i].value = c;
+        });
+        updateBtn();
+        if (text.length >= 6) document.getElementById('form2fa').requestSubmit();
+      });
+    });
+
+    document.getElementById('form2fa').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const codigo = getCodigo();
+      if (codigo.length < 6) return;
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Verificando...';
+      alerta.className = 'alert hidden';
+
+      try {
+        const res = await fetch('/api/ponto', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'verificar2fa', tokenTemp, codigo })
+        });
+        const data = await res.json();
+
+        if (!data.sucesso) {
+          alerta.textContent = data.erro || 'Código inválido.';
+          alerta.className = 'alert alert-error';
+          digits.forEach(d => { d.value = ''; });
+          digits[0].focus();
+          btn.disabled = false;
+          btn.textContent = 'Verificar código';
+          return;
+        }
+
+        sessionStorage.removeItem('fp_token_temp');
+        sessionStorage.removeItem('fp_nome_temp');
+        sessionStorage.setItem('fp_token', data.token);
+        sessionStorage.setItem('fp_perfil', data.perfil);
+        sessionStorage.setItem('fp_nome', data.nome || '');
+        window.location.replace('/');
+
+      } catch (err) {
+        alerta.textContent = 'Erro de conexão. Tente novamente.';
+        alerta.className = 'alert alert-error';
+        btn.disabled = false;
+        btn.textContent = 'Verificar código';
+      }
+    });
+  </script>
+</body>
+</html>

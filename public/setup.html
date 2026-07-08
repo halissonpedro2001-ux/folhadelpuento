@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Configuração Inicial — Folha de Ponto NEW Elevadores</title>
+  <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+  <div class="login-page">
+    <div class="login-box">
+      <div class="login-logo">
+        <div class="mark">N</div>
+        <div>
+          <div class="title">NEW Elevadores</div>
+          <div class="subtitle">Configuração Inicial do Sistema</div>
+        </div>
+      </div>
+
+      <h2>Criar conta de administrador</h2>
+      <p>Este formulário só funciona uma vez, quando ainda não há nenhum administrador cadastrado.</p>
+
+      <div id="alerta" class="alert alert-error hidden"></div>
+      <div id="sucesso" class="alert alert-success hidden"></div>
+
+      <form id="formSetup" autocomplete="off">
+        <div class="field mb-16">
+          <label for="nome">Nome completo</label>
+          <input type="text" id="nome" placeholder="Seu nome completo" required>
+        </div>
+
+        <div class="field mb-16">
+          <label for="email">Email do administrador</label>
+          <input type="email" id="email" placeholder="admin@neweleadores.com.br" required>
+        </div>
+
+        <div class="field mb-16">
+          <label for="senha">Senha (mínimo 8 caracteres)</label>
+          <input type="password" id="senha" minlength="8" required>
+        </div>
+
+        <div class="field mb-24">
+          <label for="confirmar">Confirmar senha</label>
+          <input type="password" id="confirmar" minlength="8" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-full" id="btnSetup">
+          Criar administrador
+        </button>
+      </form>
+
+      <p class="text-center text-muted text-small mt-16">
+        Após criar o administrador, acesse <a href="/login.html" style="color: var(--accent);">a tela de login</a>.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('formSetup');
+    const btn = document.getElementById('btnSetup');
+    const alerta = document.getElementById('alerta');
+    const sucesso = document.getElementById('sucesso');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      alerta.className = 'alert hidden';
+
+      const nome = document.getElementById('nome').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const senha = document.getElementById('senha').value;
+      const confirmar = document.getElementById('confirmar').value;
+
+      if (senha !== confirmar) {
+        alerta.textContent = 'As senhas não coincidem.';
+        alerta.className = 'alert alert-error';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Criando...';
+
+      try {
+        const res = await fetch('/api/ponto', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'setupAdmin', nome, email, senha })
+        });
+        const data = await res.json();
+
+        if (!data.sucesso) {
+          alerta.textContent = data.erro || 'Erro ao criar administrador.';
+          alerta.className = 'alert alert-error';
+          return;
+        }
+
+        form.classList.add('hidden');
+        sucesso.textContent = '✅ Administrador criado com sucesso! Redirecionando para o login...';
+        sucesso.className = 'alert alert-success';
+        setTimeout(() => window.location.replace('/login.html'), 2500);
+
+      } catch (err) {
+        alerta.textContent = 'Erro de conexão. Tente novamente.';
+        alerta.className = 'alert alert-error';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Criar administrador';
+      }
+    });
+  </script>
+</body>
+</html>

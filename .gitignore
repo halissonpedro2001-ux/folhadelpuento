@@ -1,0 +1,12 @@
+node_modules/
+.wrangler/
+.env
+.env.*
+*.local
+*.log
+dist/
+*.sqlite
+*.db
+*.dump
+*.bak
+*.zip

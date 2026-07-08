@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Folha de Ponto — NEW Elevadores</title>
+  <link rel="stylesheet" href="/assets/css/app.css">
+  <style>
+    .ponto-table td input[type="time"] { width: 88px; }
+    .ponto-table td.col-data { min-width: 90px; }
+    .ponto-table td.col-dia  { min-width: 40px; font-weight: 500; color: var(--muted); }
+    .ponto-table td.col-tipo { min-width: 110px; }
+    .ponto-table td.col-hora { min-width: 92px; }
+    .ponto-table td.col-oc   { min-width: 120px; }
+    .ponto-table td.col-ht   { min-width: 72px; font-weight: 600; }
+    .ponto-table td.col-bh   { min-width: 72px; }
+    .ponto-table td.col-obs  { min-width: 110px; }
+    .ponto-table td.col-save { min-width: 60px; }
+    .save-indicator { font-size: .75rem; color: var(--ok); font-weight: 600; }
+    .save-indicator.error { color: var(--danger); }
+    .row-saving { opacity: .6; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="loadingPage" class="loading-page">
+    <div class="spinner-lg"></div>
+    <p style="color: var(--muted)">Carregando folha de ponto...</p>
+  </div>
+
+  <div id="appWrap" class="app-wrap hidden">
+    <header class="app-header">
+      <a href="/" class="logo">
+        <div class="logo-mark">N</div>
+        <span>Folha de Ponto</span>
+      </a>
+      <nav>
+        <a href="/" id="navDashboard">Dashboard</a>
+        <a href="/ponto.html" class="active" id="navPonto">Meu Ponto</a>
+        <a href="/configurar-2fa.html" id="navConfig">Segurança</a>
+        <a href="/admin.html" id="navAdmin" class="hidden">Administração</a>
+      </nav>
+      <div class="header-user">
+        <strong id="headerNome">—</strong>
+        <button class="btn-logout" id="btnLogout">Sair</button>
+      </div>
+    </header>
+
+    <main class="app-main">
+      <div class="flex-center gap-12 mb-24" style="justify-content: space-between; flex-wrap: wrap;">
+        <div>
+          <h1>Folha de Ponto</h1>
+          <p id="subtitulo" style="margin-top: 4px;">Registre seus horários diários</p>
+        </div>
+        <div class="flex-center gap-8">
+          <div class="mes-selector">
+            <label for="selectMes" style="font-size: .8rem; font-weight: 600; color: var(--muted);">Mês:</label>
+            <select id="selectMes"></select>
+          </div>
+          <button class="btn btn-secondary btn-sm" id="btnImprimir">🖨 Imprimir</button>
+        </div>
+      </div>
+
+      <!-- Resumo rápido -->
+      <div class="metrics-grid mb-24" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));">
+        <div class="metric-card">
+          <div class="label">Dias Úteis</div>
+          <div class="value neutral" id="rDiasUteis">—</div>
+        </div>
+        <div class="metric-card">
+          <div class="label">Horas Previstas</div>
+          <div class="value neutral" id="rHorasPrev">—</div>
+        </div>
+        <div class="metric-card">
+          <div class="label">Horas Trabalhadas</div>
+          <div class="value" id="rHorasTrab">—</div>
+        </div>
+        <div class="metric-card">
+          <div class="label">Crédito BH</div>
+          <div class="value positive" id="rCredito">—</div>
+        </div>
+        <div class="metric-card">
+          <div class="label">Débito BH</div>
+          <div class="value negative" id="rDebito">—</div>
+        </div>
+        <div class="metric-card">
+          <div class="label">Saldo Final</div>
+          <div class="value" id="rSaldoFinal">—</div>
+        </div>
+      </div>
+
+      <!-- Tabela de ponto -->
+      <div class="card" style="padding: 0; overflow: hidden;">
+        <div class="ponto-wrap">
+          <table class="ponto-table" id="tabelaPonto">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Dia</th>
+                <th>Tipo</th>
+                <th>Entrada</th>
+                <th>Saída Almoço</th>
+                <th>Retorno</th>
+                <th>Saída</th>
+                <th>Ocorrência</th>
+                <th>H. Trabalhadas</th>
+                <th>H. Previstas</th>
+                <th>Saldo</th>
+                <th>Observações</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="corpoTabela">
+              <tr><td colspan="13" style="text-align:center; padding: 32px; color: var(--muted);">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Legenda -->
+      <div class="flex-center gap-12 mt-16" style="flex-wrap: wrap;">
+        <span class="badge util">Dia útil</span>
+        <span class="badge fds">Fim de semana</span>
+        <span class="badge feriado">Feriado</span>
+        <span style="font-size: .78rem; color: var(--muted);">
+          Clique em <strong>Salvar</strong> após preencher os horários de cada dia.
+        </span>
+      </div>
+    </main>
+  </div>
+
+  <script src="/assets/js/app.js"></script>
+  <script>
+    const { Sessao, api, UI, formatarMesAno, gerarOpcoesMeses, mesAnoAtual } = FP;
+
+    if (!Sessao.isLogado()) window.location.replace('/login.html');
+
+    document.getElementById('headerNome').textContent = Sessao.nome || 'Usuário';
+    document.getElementById('btnLogout').onclick = () => Sessao.logout();
+    if (Sessao.isAdmin()) document.getElementById('navAdmin').classList.remove('hidden');
+
+    const OCORRENCIAS = ['', 'Trabalhado', 'Folga', 'Atestado', 'Férias',
+                         'Compensação', 'Falta', 'Banco de Horas', 'Meio período', 'Outro'];
+    const HOJE = new Date().toISOString().slice(0, 10);
+
+    let mesAtual = mesAnoAtual();
+    let gradeAtual = [];
+
+    function formatData(d) {
+      const [a, m, dia] = d.split('-');
+      return `${dia}/${m}/${a}`;
+    }
+
+    function calcularResumo(grade) {
+      let diasUteis = 0, horasPrev = 0, horasTrab = 0, credito = 0, debito = 0;
+      for (const r of grade) {
+        if (r.horas_previstas > 0) diasUteis++;
+        horasPrev += r.horas_previstas || 0;
+        if (r.horas_trabalhadas != null) horasTrab += r.horas_trabalhadas;
+        credito += r.credito_bh || 0;
+        debito  += r.debito_bh  || 0;
+      }
+      return { diasUteis, horasPrev, horasTrab, credito, debito };
+    }
+
+    function atualizarResumo(grade, saldoAnterior) {
+      const r = calcularResumo(grade);
+      const saldoMes = r.credito - r.debito;
+      const saldoFinal = (saldoAnterior || 0) + saldoMes;
+
+      document.getElementById('rDiasUteis').textContent = r.diasUteis;
+      document.getElementById('rHorasPrev').textContent = UI.formatHoras(r.horasPrev);
+      document.getElementById('rHorasTrab').textContent = UI.formatHoras(r.horasTrab);
+      document.getElementById('rCredito').textContent = UI.formatHoras(r.credito);
+      document.getElementById('rDebito').textContent = UI.formatHoras(r.debito);
+      document.getElementById('rSaldoFinal').innerHTML = UI.formatSaldo(saldoFinal);
+    }
+
+    function renderTabela(grade, saldoAnterior) {
+      gradeAtual = grade;
+      const tbody = document.getElementById('corpoTabela');
+      tbody.innerHTML = '';
+
+      for (const linha of grade) {
+        const tr = document.createElement('tr');
+        const isFds = linha.tipo_dia === 'Fim de semana';
+        const isFer = linha.tipo_dia === 'Feriado';
+        const isHoje = linha.data === HOJE;
+        const isPreenchido = linha.entrada || linha.ocorrencia;
+
+        if (isFds) tr.classList.add('fim-semana');
+        else if (isFer) tr.classList.add('feriado');
+        else if (isHoje) tr.classList.add('hoje');
+        else if (isPreenchido) tr.classList.add('preenchido');
+
+        const disabled = isFds || isFer;
+
+        tr.innerHTML = `
+          <td class="col-data">${formatData(linha.data)}</td>
+          <td class="col-dia">${linha.dia}</td>
+          <td class="col-tipo">${UI.badgeTipoDia(linha.tipo_dia)}</td>
+          <td class="col-hora">
+            <input type="time" class="campo-hora" data-campo="entrada" data-data="${linha.data}"
+                   value="${linha.entrada || ''}" ${disabled ? 'disabled' : ''}>
+          </td>
+          <td class="col-hora">
+            <input type="time" class="campo-hora" data-campo="saida_almoco" data-data="${linha.data}"
+                   value="${linha.saida_almoco || ''}" ${disabled ? 'disabled' : ''}>
+          </td>
+          <td class="col-hora">
+            <input type="time" class="campo-hora" data-campo="retorno_almoco" data-data="${linha.data}"
+                   value="${linha.retorno_almoco || ''}" ${disabled ? 'disabled' : ''}>
+          </td>
+          <td class="col-hora">
+            <input type="time" class="campo-hora" data-campo="saida" data-data="${linha.data}"
+                   value="${linha.saida || ''}" ${disabled ? 'disabled' : ''}>
+          </td>
+          <td class="col-oc">
+            <select class="campo-oc" data-data="${linha.data}" ${disabled ? 'disabled' : ''}>
+              ${OCORRENCIAS.map(o => `<option value="${o}" ${o === (linha.ocorrencia || '') ? 'selected' : ''}>${o || '—'}</option>`).join('')}
+            </select>
+          </td>
+          <td class="col-ht" id="ht-${linha.data}">${UI.formatHoras(linha.horas_trabalhadas)}</td>
+          <td class="col-bh">${UI.formatHoras(linha.horas_previstas)}</td>
+          <td class="col-bh" id="saldo-${linha.data}">${UI.formatSaldo(linha.saldo_dia)}</td>
+          <td class="col-obs">
+            <input type="text" class="obs-input campo-obs" data-data="${linha.data}"
+                   value="${(linha.observacoes || '').replace(/"/g, '&quot;')}"
+                   maxlength="200" placeholder="obs..." ${disabled ? 'disabled' : ''}>
+          </td>
+          <td class="col-save">
+            <button class="btn btn-primary btn-sm btn-salvar" data-data="${linha.data}" ${disabled ? 'disabled style="display:none"' : ''}>
+              Salvar
+            </button>
+            <span class="save-indicator hidden" id="ind-${linha.data}"></span>
+          </td>
+        `;
+
+        tbody.appendChild(tr);
+      }
+
+      // Event listeners para salvar
+      tbody.querySelectorAll('.btn-salvar').forEach(btn => {
+        btn.addEventListener('click', () => salvarLinha(btn.dataset.data, btn.closest('tr')));
+      });
+
+      // Enter em campos de hora avança para o próximo
+      tbody.querySelectorAll('.campo-hora').forEach(input => {
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            const campos = Array.from(tbody.querySelectorAll('.campo-hora, .campo-oc'));
+            const idx = campos.indexOf(input);
+            if (idx >= 0 && idx < campos.length - 1) campos[idx + 1].focus();
+          }
+        });
+      });
+
+      atualizarResumo(grade, saldoAnterior);
+    }
+
+    async function salvarLinha(data, tr) {
+      const getVal = (campo) => {
+        const el = tr.querySelector(`[data-campo="${campo}"]`);
+        return el ? el.value : '';
+      };
+      const ocEl = tr.querySelector('.campo-oc');
+      const obsEl = tr.querySelector('.campo-obs');
+
+      const payload = {
+        data,
+        entrada: getVal('entrada') || null,
+        saida_almoco: getVal('saida_almoco') || null,
+        retorno_almoco: getVal('retorno_almoco') || null,
+        saida: getVal('saida') || null,
+        ocorrencia: ocEl ? ocEl.value : null,
+        observacoes: obsEl ? obsEl.value : ''
+      };
+
+      tr.classList.add('row-saving');
+      const ind = document.getElementById(`ind-${data}`);
+      ind.className = 'save-indicator';
+      ind.textContent = '⏳';
+
+      try {
+        const res = await api('salvarPonto', payload);
+        ind.textContent = '✓';
+        ind.className = 'save-indicator';
+
+        // Atualizar células calculadas
+        document.getElementById(`ht-${data}`).textContent = UI.formatHoras(res.horasTrabalhadas);
+        document.getElementById(`saldo-${data}`).innerHTML = UI.formatSaldo(res.saldoDia);
+
+        // Atualizar grade local
+        const idx = gradeAtual.findIndex(r => r.data === data);
+        if (idx >= 0) {
+          gradeAtual[idx] = { ...gradeAtual[idx], ...payload,
+            horas_trabalhadas: res.horasTrabalhadas,
+            saldo_dia: res.saldoDia };
+        }
+
+        // Recarregar resumo
+        await carregarResumo();
+
+        setTimeout(() => { ind.className = 'save-indicator hidden'; }, 3000);
+      } catch (err) {
+        ind.textContent = '✗ ' + (err.message || 'Erro');
+        ind.className = 'save-indicator error';
+      } finally {
+        tr.classList.remove('row-saving');
+      }
+    }
+
+    async function carregarResumo() {
+      try {
+        const data = await api('getDashboard', { mesAno: mesAtual });
+        const r = data.resumo;
+        const u = data.usuario;
+        atualizarResumo(gradeAtual, u.saldo_anterior);
+      } catch {}
+    }
+
+    async function carregarPonto() {
+      document.getElementById('corpoTabela').innerHTML =
+        '<tr><td colspan="13" style="text-align:center; padding: 32px; color: var(--muted);">Carregando...</td></tr>';
+
+      try {
+        const data = await api('listarPonto', { mesAno: mesAtual });
+        const perfil = await api('getMeuPerfil');
+        document.getElementById('subtitulo').textContent =
+          `${perfil.usuario.nome} · ${formatarMesAno(mesAtual)}`;
+        renderTabela(data.grade, perfil.usuario.saldo_anterior || 0);
+      } catch (err) {
+        document.getElementById('corpoTabela').innerHTML =
+          `<tr><td colspan="13" style="text-align:center; padding: 32px; color: var(--danger);">${err.message}</td></tr>`;
+      }
+    }
+
+    // Imprimir
+    document.getElementById('btnImprimir').onclick = () => window.print();
+
+    // Inicializar
+    const selectMes = document.getElementById('selectMes');
+    gerarOpcoesMeses(selectMes, mesAtual);
+    selectMes.addEventListener('change', () => {
+      mesAtual = selectMes.value;
+      carregarPonto();
+    });
+
+    document.getElementById('loadingPage').classList.add('hidden');
+    document.getElementById('appWrap').classList.remove('hidden');
+
+    carregarPonto();
+  </script>
+</body>
+</html>

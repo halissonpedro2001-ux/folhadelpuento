@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — Folha de Ponto NEW Elevadores</title>
+  <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+  <div class="login-page">
+    <div class="login-box">
+      <div class="login-logo">
+        <div class="mark">N</div>
+        <div>
+          <div class="title">NEW Elevadores</div>
+          <div class="subtitle">Sistema de Folha de Ponto</div>
+        </div>
+      </div>
+
+      <h2>Entrar na sua conta</h2>
+      <p>Digite seu email e senha para acessar o sistema.</p>
+
+      <div id="alerta" class="alert alert-error hidden"></div>
+
+      <form id="formLogin" autocomplete="on">
+        <div class="field mb-16">
+          <label for="email">Email corporativo</label>
+          <input type="email" id="email" name="email" placeholder="seu@email.com"
+                 autocomplete="email" required autofocus>
+        </div>
+
+        <div class="field mb-24">
+          <label for="senha">Senha</label>
+          <input type="password" id="senha" name="password" placeholder="••••••••"
+                 autocomplete="current-password" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-full" id="btnLogin">
+          Entrar
+        </button>
+      </form>
+
+      <p class="text-center text-muted text-small mt-16">
+        Problemas de acesso? Fale com o administrador do sistema.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    // Redirecionar se já estiver logado
+    const token = sessionStorage.getItem('fp_token');
+    if (token) window.location.replace('/');
+
+    const form = document.getElementById('formLogin');
+    const btn  = document.getElementById('btnLogin');
+    const alerta = document.getElementById('alerta');
+
+    function showAlert(msg, tipo = 'error') {
+      alerta.textContent = msg;
+      alerta.className = `alert alert-${tipo}`;
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Entrando...';
+      alerta.className = 'alert hidden';
+
+      const email = document.getElementById('email').value.trim();
+      const senha = document.getElementById('senha').value;
+
+      try {
+        const res = await fetch('/api/ponto', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'login', email, senha })
+        });
+        const data = await res.json();
+
+        if (!data.sucesso) {
+          showAlert(data.erro || 'Erro ao fazer login.');
+          return;
+        }
+
+        if (data.requer2fa) {
+          // Guardar token temporário e redirecionar para 2FA
+          sessionStorage.setItem('fp_token_temp', data.tokenTemp);
+          sessionStorage.setItem('fp_nome_temp', data.nome || '');
+          window.location.replace('/verificar-2fa.html');
+          return;
+        }
+
+        // Login completo
+        sessionStorage.setItem('fp_token', data.token);
+        sessionStorage.setItem('fp_perfil', data.perfil);
+        sessionStorage.setItem('fp_nome', data.nome || '');
+        window.location.replace('/');
+
+      } catch (err) {
+        showAlert('Erro de conexão. Verifique sua internet.');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Entrar';
+      }
+    });
+  </script>
+</body>
+</html>
