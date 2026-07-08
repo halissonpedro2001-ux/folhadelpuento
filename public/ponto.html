@@ -19,6 +19,11 @@
     .save-indicator { font-size: .75rem; color: var(--ok); font-weight: 600; }
     .save-indicator.error { color: var(--danger); }
     .row-saving { opacity: .6; pointer-events: none; }
+    .periodo-fechado-aviso {
+      background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px;
+      padding: 10px 16px; margin-bottom: 16px; font-size: .9rem;
+      display: flex; align-items: center; gap: 8px;
+    }
   </style>
 </head>
 <body>
@@ -46,32 +51,45 @@
     </header>
 
     <main class="app-main">
-      <div class="flex-center gap-12 mb-24" style="justify-content: space-between; flex-wrap: wrap;">
+      <!-- Cabeçalho com navegação de mês -->
+      <div class="flex-center gap-12 mb-16" style="justify-content: space-between; flex-wrap: wrap;">
         <div>
           <h1>Folha de Ponto</h1>
-          <p id="subtitulo" style="margin-top: 4px;">Registre seus horários diários</p>
+          <p id="subtitulo" style="margin-top: 4px; color: var(--muted);">Registre seus horários diários</p>
         </div>
-        <div class="flex-center gap-8">
-          <div class="mes-selector">
-            <label for="selectMes" style="font-size: .8rem; font-weight: 600; color: var(--muted);">Mês:</label>
-            <select id="selectMes"></select>
+        <div class="mes-nav-group">
+          <button class="btn-nav-arrow" id="btnMesAnterior" title="Mês anterior">&#8249;</button>
+          <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+            <span id="mesAtualLabel" style="font-weight:700; font-size:1.05rem; min-width:160px; text-align:center;">—</span>
+            <select id="selectPeriodo" class="select-periodo" title="Ir para período">
+              <option value="">Ir para período...</option>
+            </select>
           </div>
-          <button class="btn btn-secondary btn-sm" id="btnImprimir">🖨 Imprimir</button>
+          <button class="btn-nav-arrow" id="btnProximoMes" title="Próximo mês">&#8250;</button>
+          <button class="btn btn-secondary btn-sm" id="btnImprimir" style="margin-left:8px;">🖨 Imprimir</button>
         </div>
       </div>
 
+      <!-- Aviso de período fechado -->
+      <div id="avisoPeriodoFechado" class="periodo-fechado-aviso hidden">
+        🔒 <strong>Período fechado.</strong> Os registros são somente leitura.
+        <span id="btnReabrirInline" class="hidden">
+          <button class="btn btn-outline btn-sm" onclick="reabrirPeriodo()">Reabrir</button>
+        </span>
+      </div>
+
       <!-- Resumo rápido -->
-      <div class="metrics-grid mb-24" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));">
+      <div class="metrics-grid mb-16" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));">
         <div class="metric-card">
-          <div class="label">Dias Úteis</div>
-          <div class="value neutral" id="rDiasUteis">—</div>
+          <div class="label">Dias Trabalhados</div>
+          <div class="value neutral" id="rDiasTrab">—</div>
         </div>
         <div class="metric-card">
-          <div class="label">Horas Previstas</div>
+          <div class="label">H. Previstas</div>
           <div class="value neutral" id="rHorasPrev">—</div>
         </div>
         <div class="metric-card">
-          <div class="label">Horas Trabalhadas</div>
+          <div class="label">H. Trabalhadas</div>
           <div class="value" id="rHorasTrab">—</div>
         </div>
         <div class="metric-card">
@@ -83,7 +101,15 @@
           <div class="value negative" id="rDebito">—</div>
         </div>
         <div class="metric-card">
-          <div class="label">Saldo Final</div>
+          <div class="label">Saldo do Mês</div>
+          <div class="value" id="rSaldoMes">—</div>
+        </div>
+        <div class="metric-card">
+          <div class="label">Saldo Anterior</div>
+          <div class="value neutral" id="rSaldoAnterior">—</div>
+        </div>
+        <div class="metric-card" style="border:2px solid var(--primary);">
+          <div class="label">Saldo Acumulado</div>
           <div class="value" id="rSaldoFinal">—</div>
         </div>
       </div>
@@ -130,7 +156,7 @@
 
   <script src="/assets/js/app.js"></script>
   <script>
-    const { Sessao, api, UI, formatarMesAno, gerarOpcoesMeses, mesAnoAtual } = FP;
+    const { Sessao, api, UI, formatarMesAno, mesAnoAtual } = FP;
 
     if (!Sessao.isLogado()) window.location.replace('/login.html');
 
@@ -142,41 +168,58 @@
                          'Compensação', 'Falta', 'Banco de Horas', 'Meio período', 'Outro'];
     const HOJE = new Date().toISOString().slice(0, 10);
 
-    let mesAtual = mesAnoAtual();
+    // Ler mês da URL se vier do dashboard
+    const urlParams = new URLSearchParams(window.location.search);
+    let mesAtual = urlParams.get('mes') || mesAnoAtual();
     let gradeAtual = [];
+    let periodoAtual = null;
+    let periodosCache = [];
+    let periodoFechado = false;
+
+    // Navegação
+    document.getElementById('btnMesAnterior').onclick = () => navegarMes(-1);
+    document.getElementById('btnProximoMes').onclick  = () => navegarMes(1);
+    document.getElementById('selectPeriodo').addEventListener('change', function() {
+      if (this.value) { mesAtual = this.value; carregarPonto(); }
+    });
+    document.getElementById('btnImprimir').onclick = () => window.print();
+
+    function navegarMes(delta) {
+      const [ano, mes] = mesAtual.split('-').map(Number);
+      let nm = mes + delta, na = ano;
+      if (nm < 1)  { nm = 12; na--; }
+      if (nm > 12) { nm = 1;  na++; }
+      mesAtual = `${na}-${String(nm).padStart(2,'0')}`;
+      carregarPonto();
+    }
 
     function formatData(d) {
       const [a, m, dia] = d.split('-');
       return `${dia}/${m}/${a}`;
     }
 
-    function calcularResumo(grade) {
-      let diasUteis = 0, horasPrev = 0, horasTrab = 0, credito = 0, debito = 0;
-      for (const r of grade) {
-        if (r.horas_previstas > 0) diasUteis++;
-        horasPrev += r.horas_previstas || 0;
-        if (r.horas_trabalhadas != null) horasTrab += r.horas_trabalhadas;
-        credito += r.credito_bh || 0;
-        debito  += r.debito_bh  || 0;
-      }
-      return { diasUteis, horasPrev, horasTrab, credito, debito };
+    function atualizarResumo(resumo) {
+      document.getElementById('rDiasTrab').textContent     = resumo.dias_trabalhados ?? '—';
+      document.getElementById('rHorasPrev').textContent    = UI.formatHoras(resumo.horas_previstas);
+      document.getElementById('rHorasTrab').textContent    = UI.formatHoras(resumo.horas_trabalhadas);
+      document.getElementById('rCredito').textContent      = UI.formatHoras(resumo.credito);
+      document.getElementById('rDebito').textContent       = UI.formatHoras(resumo.debito);
+      document.getElementById('rSaldoAnterior').textContent = UI.formatHoras(resumo.saldo_anterior);
+      document.getElementById('rSaldoMes').innerHTML       = UI.formatSaldo(resumo.saldo_mes);
+      document.getElementById('rSaldoFinal').innerHTML     = UI.formatSaldo(resumo.saldo_final);
     }
 
-    function atualizarResumo(grade, saldoAnterior) {
-      const r = calcularResumo(grade);
-      const saldoMes = r.credito - r.debito;
-      const saldoFinal = (saldoAnterior || 0) + saldoMes;
-
-      document.getElementById('rDiasUteis').textContent = r.diasUteis;
-      document.getElementById('rHorasPrev').textContent = UI.formatHoras(r.horasPrev);
-      document.getElementById('rHorasTrab').textContent = UI.formatHoras(r.horasTrab);
-      document.getElementById('rCredito').textContent = UI.formatHoras(r.credito);
-      document.getElementById('rDebito').textContent = UI.formatHoras(r.debito);
-      document.getElementById('rSaldoFinal').innerHTML = UI.formatSaldo(saldoFinal);
+    function atualizarSelectPeriodos() {
+      const sel = document.getElementById('selectPeriodo');
+      sel.innerHTML = '<option value="">Ir para período...</option>' +
+        periodosCache.map(p =>
+          `<option value="${p.mesAno}" ${p.mesAno === mesAtual ? 'selected' : ''}>${p.label}${p.status === 'fechado' ? ' 🔒' : ''}</option>`
+        ).join('');
     }
 
-    function renderTabela(grade, saldoAnterior) {
+    function renderTabela(grade, fechado) {
       gradeAtual = grade;
+      periodoFechado = fechado;
       const tbody = document.getElementById('corpoTabela');
       tbody.innerHTML = '';
 
@@ -192,7 +235,8 @@
         else if (isHoje) tr.classList.add('hoje');
         else if (isPreenchido) tr.classList.add('preenchido');
 
-        const disabled = isFds || isFer;
+        // Desabilitar se fim de semana, feriado, ou período fechado (não admin)
+        const disabled = isFds || isFer || (fechado && !Sessao.isAdmin());
 
         tr.innerHTML = `
           <td class="col-data">${formatData(linha.data)}</td>
@@ -228,22 +272,20 @@
                    maxlength="200" placeholder="obs..." ${disabled ? 'disabled' : ''}>
           </td>
           <td class="col-save">
-            <button class="btn btn-primary btn-sm btn-salvar" data-data="${linha.data}" ${disabled ? 'disabled style="display:none"' : ''}>
-              Salvar
-            </button>
-            <span class="save-indicator hidden" id="ind-${linha.data}"></span>
+            ${disabled ? '' : `
+              <button class="btn btn-primary btn-sm btn-salvar" data-data="${linha.data}">Salvar</button>
+              <span class="save-indicator hidden" id="ind-${linha.data}"></span>
+            `}
           </td>
         `;
 
         tbody.appendChild(tr);
       }
 
-      // Event listeners para salvar
+      // Event listeners
       tbody.querySelectorAll('.btn-salvar').forEach(btn => {
         btn.addEventListener('click', () => salvarLinha(btn.dataset.data, btn.closest('tr')));
       });
-
-      // Enter em campos de hora avança para o próximo
       tbody.querySelectorAll('.campo-hora').forEach(input => {
         input.addEventListener('keydown', (e) => {
           if (e.key === 'Enter') {
@@ -253,8 +295,6 @@
           }
         });
       });
-
-      atualizarResumo(grade, saldoAnterior);
     }
 
     async function salvarLinha(data, tr) {
@@ -262,34 +302,30 @@
         const el = tr.querySelector(`[data-campo="${campo}"]`);
         return el ? el.value : '';
       };
-      const ocEl = tr.querySelector('.campo-oc');
+      const ocEl  = tr.querySelector('.campo-oc');
       const obsEl = tr.querySelector('.campo-obs');
 
       const payload = {
         data,
-        entrada: getVal('entrada') || null,
-        saida_almoco: getVal('saida_almoco') || null,
+        entrada:        getVal('entrada')        || null,
+        saida_almoco:   getVal('saida_almoco')   || null,
         retorno_almoco: getVal('retorno_almoco') || null,
-        saida: getVal('saida') || null,
-        ocorrencia: ocEl ? ocEl.value : null,
-        observacoes: obsEl ? obsEl.value : ''
+        saida:          getVal('saida')          || null,
+        ocorrencia:     ocEl  ? ocEl.value  : null,
+        observacoes:    obsEl ? obsEl.value : ''
       };
 
       tr.classList.add('row-saving');
       const ind = document.getElementById(`ind-${data}`);
-      ind.className = 'save-indicator';
-      ind.textContent = '⏳';
+      if (ind) { ind.className = 'save-indicator'; ind.textContent = '⏳'; }
 
       try {
         const res = await api('salvarPonto', payload);
-        ind.textContent = '✓';
-        ind.className = 'save-indicator';
+        if (ind) { ind.textContent = '✓'; ind.className = 'save-indicator'; }
 
-        // Atualizar células calculadas
         document.getElementById(`ht-${data}`).textContent = UI.formatHoras(res.horasTrabalhadas);
         document.getElementById(`saldo-${data}`).innerHTML = UI.formatSaldo(res.saldoDia);
 
-        // Atualizar grade local
         const idx = gradeAtual.findIndex(r => r.data === data);
         if (idx >= 0) {
           gradeAtual[idx] = { ...gradeAtual[idx], ...payload,
@@ -297,24 +333,21 @@
             saldo_dia: res.saldoDia };
         }
 
-        // Recarregar resumo
-        await carregarResumo();
+        // Recarregar resumo atualizado
+        await recarregarResumo();
 
-        setTimeout(() => { ind.className = 'save-indicator hidden'; }, 3000);
+        if (ind) setTimeout(() => { ind.className = 'save-indicator hidden'; }, 3000);
       } catch (err) {
-        ind.textContent = '✗ ' + (err.message || 'Erro');
-        ind.className = 'save-indicator error';
+        if (ind) { ind.textContent = '✗ ' + (err.message || 'Erro'); ind.className = 'save-indicator error'; }
       } finally {
         tr.classList.remove('row-saving');
       }
     }
 
-    async function carregarResumo() {
+    async function recarregarResumo() {
       try {
-        const data = await api('getDashboard', { mesAno: mesAtual });
-        const r = data.resumo;
-        const u = data.usuario;
-        atualizarResumo(gradeAtual, u.saldo_anterior);
+        const data = await api('listarPonto', { mesAno: mesAtual });
+        if (data.resumo) atualizarResumo(data.resumo);
       } catch {}
     }
 
@@ -324,30 +357,48 @@
 
       try {
         const data = await api('listarPonto', { mesAno: mesAtual });
-        const perfil = await api('getMeuPerfil');
-        document.getElementById('subtitulo').textContent =
-          `${perfil.usuario.nome} · ${formatarMesAno(mesAtual)}`;
-        renderTabela(data.grade, perfil.usuario.saldo_anterior || 0);
+        periodoAtual = data.periodo;
+        periodosCache = data.periodos || [];
+        const fechado = periodoAtual && periodoAtual.status === 'fechado';
+
+        // Label do mês
+        document.getElementById('mesAtualLabel').textContent = data.resumo?.mes_label || formatarMesAno(mesAtual);
+        document.getElementById('subtitulo').textContent = `${formatarMesAno(mesAtual)} · ${fechado ? '🔒 Período fechado' : '🟢 Período aberto'}`;
+
+        // Aviso de período fechado
+        const aviso = document.getElementById('avisoPeriodoFechado');
+        if (fechado) {
+          aviso.classList.remove('hidden');
+          if (Sessao.isAdmin()) document.getElementById('btnReabrirInline').classList.remove('hidden');
+        } else {
+          aviso.classList.add('hidden');
+        }
+
+        // Select de períodos
+        atualizarSelectPeriodos();
+
+        // Resumo
+        if (data.resumo) atualizarResumo(data.resumo);
+
+        // Tabela
+        renderTabela(data.grade, fechado);
+
       } catch (err) {
         document.getElementById('corpoTabela').innerHTML =
           `<tr><td colspan="13" style="text-align:center; padding: 32px; color: var(--danger);">${err.message}</td></tr>`;
       }
     }
 
-    // Imprimir
-    document.getElementById('btnImprimir').onclick = () => window.print();
+    async function reabrirPeriodo() {
+      if (!confirm(`Reabrir o período ${formatarMesAno(mesAtual)}?`)) return;
+      const resp = await api('reabrirPeriodo', { mesAno: mesAtual });
+      if (resp.sucesso) { alert(resp.mensagem); carregarPonto(); }
+      else alert('Erro: ' + resp.erro);
+    }
 
-    // Inicializar
-    const selectMes = document.getElementById('selectMes');
-    gerarOpcoesMeses(selectMes, mesAtual);
-    selectMes.addEventListener('change', () => {
-      mesAtual = selectMes.value;
-      carregarPonto();
-    });
-
+    // Mostrar app
     document.getElementById('loadingPage').classList.add('hidden');
     document.getElementById('appWrap').classList.remove('hidden');
-
     carregarPonto();
   </script>
 </body>

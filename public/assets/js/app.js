@@ -97,6 +97,13 @@
       return `<span class="saldo-zer">${f}</span>`;
     },
 
+    formatSaldoSimples(h) {
+      if (h == null) return '—';
+      const f = UI.formatHoras(h);
+      if (h > 0.01) return `+${f}`;
+      return f;
+    },
+
     badgeTipoDia(tipo) {
       const map = {
         'Dia útil':    ['util',    'Dia útil'],
@@ -183,6 +190,7 @@
   }
 
   // ── Exportar ──────────────────────────────────────────────────────────────
-  global.FP = { Sessao, api, UI, MESES, mesAnoAtual, formatarMesAno, gerarOpcoesMeses };
+  global.FP = { Sessao, api, UI, MESES, mesAnoAtual, formatarMesAno, gerarOpcoesMeses,
+    formatarHorasDecimal: (h) => UI.formatHoras(h) };
 
 })(window);

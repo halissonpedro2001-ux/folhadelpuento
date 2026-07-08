@@ -33,23 +33,31 @@
 
     <!-- Main -->
     <main class="app-main">
+
+      <!-- Navegação de mês -->
       <div class="flex-center gap-12 mb-24" style="justify-content: space-between; flex-wrap: wrap;">
         <div>
           <h1>Dashboard</h1>
-          <p id="subtitulo" style="margin-top: 4px;">Resumo do banco de horas</p>
+          <p id="subtitulo" style="margin-top: 4px; color: var(--muted);">Banco de horas acumulado</p>
         </div>
-        <div class="mes-selector">
-          <label for="selectMes" style="font-size: .8rem; font-weight: 600; color: var(--muted);">Mês:</label>
-          <select id="selectMes"></select>
+        <div class="mes-nav-group">
+          <button class="btn-nav-arrow" id="btnMesAnterior" title="Mês anterior">&#8249;</button>
+          <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+            <span id="mesAtualLabel" style="font-weight:700; font-size:1.1rem; min-width:160px; text-align:center;">—</span>
+            <select id="selectPeriodo" class="select-periodo" title="Ir para período">
+              <option value="">Ir para período...</option>
+            </select>
+          </div>
+          <button class="btn-nav-arrow" id="btnProximoMes" title="Próximo mês">&#8250;</button>
         </div>
       </div>
 
       <!-- Métricas -->
       <div class="metrics-grid" id="metricsGrid">
         <div class="metric-card">
-          <div class="label">Dias Úteis</div>
-          <div class="value neutral" id="mDiasUteis">—</div>
-          <div class="sub">no mês</div>
+          <div class="label">Dias Trabalhados</div>
+          <div class="value neutral" id="mDiasTrabalhados">—</div>
+          <div class="sub">no período</div>
         </div>
         <div class="metric-card">
           <div class="label">Horas Previstas</div>
@@ -79,133 +87,230 @@
         <div class="metric-card">
           <div class="label">Saldo Anterior</div>
           <div class="value neutral" id="mSaldoAnterior">—</div>
-          <div class="sub">acumulado</div>
+          <div class="sub">mês anterior</div>
         </div>
-        <div class="metric-card">
-          <div class="label">Saldo Final</div>
+        <div class="metric-card" style="border: 2px solid var(--primary);">
+          <div class="label">Saldo Acumulado</div>
           <div class="value" id="mSaldoFinal" style="font-size: 2rem;">—</div>
-          <div class="sub">banco de horas</div>
+          <div class="sub">banco de horas total</div>
         </div>
       </div>
 
-      <!-- Card de perfil -->
+      <!-- Status do período + ações -->
+      <div class="card" id="cardPeriodo" style="margin-bottom:16px;">
+        <div class="card-header">
+          <div class="card-title">
+            <div class="card-icon">📆</div>
+            <h2 id="tituloPeriodo">Período</h2>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <span id="badgePeriodo" class="badge"></span>
+            <button id="btnFecharPeriodo" class="btn btn-secondary btn-sm hidden">🔒 Fechar Período</button>
+            <button id="btnReabrirPeriodo" class="btn btn-outline btn-sm hidden">🔓 Reabrir</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Histórico de períodos -->
       <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <div class="card-icon">📊</div>
+            <h2>Histórico de Períodos</h2>
+          </div>
+          <a href="/ponto.html" class="btn btn-primary btn-sm">Ver Folha Completa →</a>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="table" id="tabelaPeriodos">
+            <thead>
+              <tr>
+                <th>Período</th>
+                <th>H. Trabalhadas</th>
+                <th>H. Previstas</th>
+                <th>Saldo do Mês</th>
+                <th>Saldo Acumulado</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="bodyPeriodos">
+              <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px;">Nenhum período registrado ainda.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Perfil -->
+      <div class="card" style="margin-top:16px;">
         <div class="card-header">
           <div class="card-title">
             <div class="card-icon">👤</div>
             <h2>Dados do Colaborador</h2>
           </div>
-          <a href="/ponto.html" class="btn btn-primary btn-sm">Ver Folha de Ponto →</a>
         </div>
         <div class="form-grid" id="perfilGrid">
-          <div class="field">
-            <label>Colaborador</label>
-            <div id="pNome" style="padding: 9px 0; font-weight: 600;">—</div>
-          </div>
-          <div class="field">
-            <label>Cargo</label>
-            <div id="pCargo" style="padding: 9px 0;">—</div>
-          </div>
-          <div class="field">
-            <label>Setor</label>
-            <div id="pSetor" style="padding: 9px 0;">—</div>
-          </div>
-          <div class="field">
-            <label>Gestor</label>
-            <div id="pGestor" style="padding: 9px 0;">—</div>
-          </div>
-          <div class="field">
-            <label>Jornada Padrão</label>
-            <div id="pJornada" style="padding: 9px 0;">—</div>
-          </div>
-          <div class="field">
-            <label>Unidade</label>
-            <div id="pUnidade" style="padding: 9px 0;">—</div>
-          </div>
+          <div class="field"><label>Colaborador</label><div id="pNome" style="padding:9px 0;font-weight:600;">—</div></div>
+          <div class="field"><label>Cargo</label><div id="pCargo" style="padding:9px 0;">—</div></div>
+          <div class="field"><label>Setor</label><div id="pSetor" style="padding:9px 0;">—</div></div>
+          <div class="field"><label>Gestor</label><div id="pGestor" style="padding:9px 0;">—</div></div>
+          <div class="field"><label>Jornada Padrão</label><div id="pJornada" style="padding:9px 0;">—</div></div>
+          <div class="field"><label>Unidade</label><div id="pUnidade" style="padding:9px 0;">—</div></div>
         </div>
       </div>
 
       <!-- Aviso 2FA -->
       <div id="aviso2fa" class="alert alert-warn mt-16 hidden">
         🔐 <strong>Segurança:</strong> Você ainda não ativou a verificação em duas etapas.
-        <a href="/configurar-2fa.html" style="color: var(--warn); font-weight: 600; margin-left: 8px;">Configurar agora →</a>
+        <a href="/configurar-2fa.html" style="color:var(--warn);font-weight:600;margin-left:8px;">Configurar agora →</a>
       </div>
     </main>
   </div>
 
   <script src="/assets/js/app.js"></script>
   <script>
-    const { Sessao, api, UI, formatarMesAno, gerarOpcoesMeses, mesAnoAtual } = FP;
+    const { Sessao, api, UI, formatarMesAno, mesAnoAtual } = FP;
 
-    if (!Sessao.isLogado()) {
-      window.location.replace('/login.html');
-    }
+    if (!Sessao.isLogado()) window.location.replace('/login.html');
 
-    // Configurar header
     document.getElementById('headerNome').textContent = Sessao.nome || 'Usuário';
     document.getElementById('btnLogout').onclick = () => Sessao.logout();
-
-    // Mostrar link admin se for admin
-    if (Sessao.isAdmin()) {
-      document.getElementById('navAdmin').classList.remove('hidden');
-    }
+    if (Sessao.isAdmin()) document.getElementById('navAdmin').classList.remove('hidden');
 
     let mesAtual = mesAnoAtual();
+    let periodosCache = [];
+
+    // Navegação por setas
+    document.getElementById('btnMesAnterior').onclick = () => navegarMes(-1);
+    document.getElementById('btnProximoMes').onclick  = () => navegarMes(1);
+    document.getElementById('selectPeriodo').addEventListener('change', function() {
+      if (this.value) { mesAtual = this.value; carregarDashboard(); }
+    });
+    document.getElementById('btnFecharPeriodo').onclick  = fecharPeriodo;
+    document.getElementById('btnReabrirPeriodo').onclick = reabrirPeriodo;
+
+    function navegarMes(delta) {
+      const [ano, mes] = mesAtual.split('-').map(Number);
+      let nm = mes + delta, na = ano;
+      if (nm < 1)  { nm = 12; na--; }
+      if (nm > 12) { nm = 1;  na++; }
+      mesAtual = `${na}-${String(nm).padStart(2,'0')}`;
+      carregarDashboard();
+    }
 
     async function carregarDashboard() {
       try {
         const data = await api('getDashboard', { mesAno: mesAtual });
         const r = data.resumo;
         const u = data.usuario;
+        const p = data.periodo;
+        periodosCache = data.periodos || [];
 
-        document.getElementById('subtitulo').textContent =
-          `${u.nome} · ${formatarMesAno(mesAtual)}`;
+        // Label do mês
+        document.getElementById('mesAtualLabel').textContent = r.mes_label || formatarMesAno(mesAtual);
+        document.getElementById('subtitulo').textContent = `${u.nome} · Banco de horas acumulado`;
 
         // Métricas
-        document.getElementById('mDiasUteis').textContent = r.dias_uteis;
-        document.getElementById('mHorasPrevistas').textContent = UI.formatHoras(r.horas_previstas);
+        document.getElementById('mDiasTrabalhados').textContent = r.dias_trabalhados ?? '—';
+        document.getElementById('mHorasPrevistas').textContent  = UI.formatHoras(r.horas_previstas);
         document.getElementById('mHorasTrabalhadas').textContent = UI.formatHoras(r.horas_trabalhadas);
-        document.getElementById('mCredito').textContent = UI.formatHoras(r.credito);
-        document.getElementById('mDebito').textContent = UI.formatHoras(r.debito);
-
-        const elSaldoMes = document.getElementById('mSaldoMes');
-        elSaldoMes.innerHTML = UI.formatSaldo(r.saldo_mes);
-
+        document.getElementById('mCredito').textContent  = UI.formatHoras(r.credito);
+        document.getElementById('mDebito').textContent   = UI.formatHoras(r.debito);
         document.getElementById('mSaldoAnterior').textContent = UI.formatHoras(r.saldo_anterior);
+        document.getElementById('mSaldoMes').innerHTML   = UI.formatSaldo(r.saldo_mes);
+        document.getElementById('mSaldoFinal').innerHTML = UI.formatSaldo(r.saldo_final);
 
-        const elSaldoFinal = document.getElementById('mSaldoFinal');
-        elSaldoFinal.innerHTML = UI.formatSaldo(r.saldo_final);
+        // Período
+        if (p) {
+          document.getElementById('tituloPeriodo').textContent = `Período: ${r.mes_label}`;
+          const badge = document.getElementById('badgePeriodo');
+          badge.textContent = p.status === 'fechado' ? '🔒 Fechado' : '🟢 Aberto';
+          badge.className = `badge ${p.status === 'fechado' ? 'badge-secondary' : 'badge-success'}`;
+
+          if (Sessao.isAdmin()) {
+            document.getElementById('btnFecharPeriodo').classList.toggle('hidden', p.status === 'fechado');
+            document.getElementById('btnReabrirPeriodo').classList.toggle('hidden', p.status !== 'fechado');
+          }
+        }
+
+        // Select de períodos
+        atualizarSelectPeriodos();
+
+        // Tabela de histórico
+        renderizarTabelaPeriodos(periodosCache);
 
         // Perfil
-        document.getElementById('pNome').textContent = u.nome || '—';
-        document.getElementById('pCargo').textContent = u.cargo || '—';
-        document.getElementById('pSetor').textContent = u.setor || '—';
-        document.getElementById('pGestor').textContent = u.gestor || '—';
+        document.getElementById('pNome').textContent    = u.nome    || '—';
+        document.getElementById('pCargo').textContent   = u.cargo   || '—';
+        document.getElementById('pSetor').textContent   = u.setor   || '—';
+        document.getElementById('pGestor').textContent  = u.gestor  || '—';
         document.getElementById('pJornada').textContent = u.jornada_padrao || '—';
         document.getElementById('pUnidade').textContent = u.unidade || '—';
 
-        // Aviso 2FA
-        if (!u.totp_ativo) {
-          document.getElementById('aviso2fa').classList.remove('hidden');
-        }
+        if (!u.totp_ativo) document.getElementById('aviso2fa').classList.remove('hidden');
 
       } catch (err) {
         console.error(err);
       }
     }
 
-    // Inicializar
-    const selectMes = document.getElementById('selectMes');
-    gerarOpcoesMeses(selectMes, mesAtual);
-    selectMes.addEventListener('change', () => {
-      mesAtual = selectMes.value;
-      carregarDashboard();
-    });
+    function atualizarSelectPeriodos() {
+      const sel = document.getElementById('selectPeriodo');
+      sel.innerHTML = '<option value="">Ir para período...</option>' +
+        periodosCache.map(p =>
+          `<option value="${p.mesAno}" ${p.mesAno === mesAtual ? 'selected' : ''}>${p.label}${p.status === 'fechado' ? ' 🔒' : ''}</option>`
+        ).join('');
+    }
+
+    function renderizarTabelaPeriodos(periodos) {
+      const tbody = document.getElementById('bodyPeriodos');
+      if (!periodos || periodos.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px;">Nenhum período registrado ainda. Acesse a folha de ponto para começar.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = periodos.map(p => {
+        const smClass  = (p.saldo_periodo  || 0) >= 0 ? 'positive' : 'negative';
+        const saClass  = (p.saldo_acumulado || 0) >= 0 ? 'positive' : 'negative';
+        const badge    = p.status === 'fechado'
+          ? '<span class="badge badge-secondary">Fechado</span>'
+          : '<span class="badge badge-success">Aberto</span>';
+        const rowClass = p.mesAno === mesAtual ? 'style="background:var(--primary-light,#f0f4ff);"' : '';
+        return `
+          <tr ${rowClass}>
+            <td><strong>${p.label}</strong></td>
+            <td>${UI.formatHoras(p.horas_trabalhadas || 0)}</td>
+            <td>${UI.formatHoras(p.horas_previstas  || 0)}</td>
+            <td class="${smClass}">${UI.formatSaldoSimples(p.saldo_periodo  || 0)}</td>
+            <td class="${saClass}"><strong>${UI.formatSaldoSimples(p.saldo_acumulado || 0)}</strong></td>
+            <td>${badge}</td>
+            <td>
+              <button class="btn-link" onclick="irParaPeriodo('${p.mesAno}')">Ver folha</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function irParaPeriodo(mesAno) {
+      window.location.href = `/ponto.html?mes=${mesAno}`;
+    }
+
+    async function fecharPeriodo() {
+      if (!confirm(`Fechar o período ${formatarMesAno(mesAtual)}?\nApós fechado, apenas administradores podem editar.`)) return;
+      const resp = await api('fecharPeriodo', { mesAno: mesAtual });
+      if (resp.sucesso) { alert(resp.mensagem); carregarDashboard(); }
+      else alert('Erro: ' + resp.erro);
+    }
+
+    async function reabrirPeriodo() {
+      if (!confirm(`Reabrir o período ${formatarMesAno(mesAtual)}?`)) return;
+      const resp = await api('reabrirPeriodo', { mesAno: mesAtual });
+      if (resp.sucesso) { alert(resp.mensagem); carregarDashboard(); }
+      else alert('Erro: ' + resp.erro);
+    }
 
     // Mostrar app
     document.getElementById('loadingPage').classList.add('hidden');
     document.getElementById('appWrap').classList.remove('hidden');
-
     carregarDashboard();
   </script>
 </body>

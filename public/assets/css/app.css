@@ -718,3 +718,84 @@ table.ponto-table {
   border-radius: 50%;
   animation: spin .7s linear infinite;
 }
+
+/* ── Navegação de mês (setas + select) ── */
+.mes-nav-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-nav-arrow {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  width: 36px;
+  height: 36px;
+  font-size: 1.4rem;
+  cursor: pointer;
+  color: var(--brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s, border-color .15s;
+  line-height: 1;
+}
+.btn-nav-arrow:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.select-periodo {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 4px 10px;
+  font-size: .8rem;
+  background: #fff;
+  cursor: pointer;
+  color: var(--muted);
+  max-width: 200px;
+}
+
+/* ── Linha ativa na tabela de períodos ── */
+.row-active {
+  background: var(--accent-soft) !important;
+}
+
+/* ── Saldo positivo/negativo nas células ── */
+td.positive, .positive { color: var(--ok); }
+td.negative, .negative { color: var(--danger); }
+
+/* ── Badge de status do período ── */
+.badge-success {
+  background: var(--ok-bg);
+  color: var(--ok);
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: .78rem;
+  font-weight: 600;
+}
+.badge-secondary {
+  background: var(--line);
+  color: var(--muted);
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: .78rem;
+  font-weight: 600;
+}
+
+/* ── Botão link inline ── */
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: .85rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 4px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.btn-link:hover { color: var(--brand); }
