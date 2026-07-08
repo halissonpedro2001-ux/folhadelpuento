@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Administração — Folha de Ponto NEW Elevadores</title>
   <link rel="stylesheet" href="/assets/css/app.css">
+  <script src="/assets/js/icons.js"></script>
   <style>
     .func-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
     .func-table th {
@@ -41,7 +42,7 @@
       </nav>
       <div class="header-user">
         <strong id="headerNome">—</strong>
-        <button class="btn-logout" id="btnLogout">Sair</button>
+        <button class="btn-logout" id="btnLogout"></button>
       </div>
     </header>
 
@@ -179,6 +180,7 @@
     if (!Sessao.isAdmin()) window.location.replace('/');
 
     document.getElementById('headerNome').textContent = Sessao.nome || 'Admin';
+    document.getElementById('btnLogout').innerHTML = icon('logOut') + ' Sair';
     document.getElementById('btnLogout').onclick = () => Sessao.logout();
 
     // Tabs
@@ -217,7 +219,7 @@
           <td>${f.setor || '—'}</td>
           <td><span class="badge ${f.perfil === 'admin' ? 'info' : 'fds'}">${f.perfil}</span></td>
           <td><span class="badge ${f.situacao === 'ATIVO' ? 'ok' : 'danger'}">${f.situacao}</span></td>
-          <td>${f.totp_ativo ? '<span class="badge ok">✓ Ativo</span>' : '<span class="badge danger">✗ Inativo</span>'}</td>
+          <td>${f.totp_ativo ? '<span class="badge ok">Ativo</span>' : '<span class="badge danger">Inativo</span>'}</td>
           <td>
             <div class="row-actions">
               <button class="btn btn-secondary btn-sm" onclick="editarFuncionario('${f.id}')">Editar</button>

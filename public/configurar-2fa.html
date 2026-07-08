@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Segurança — Folha de Ponto NEW Elevadores</title>
   <link rel="stylesheet" href="/assets/css/app.css">
+  <script src="/assets/js/icons.js"></script>
 </head>
 <body>
   <div id="loadingPage" class="loading-page">
@@ -25,7 +26,7 @@
       </nav>
       <div class="header-user">
         <strong id="headerNome">—</strong>
-        <button class="btn-logout" id="btnLogout">Sair</button>
+        <button class="btn-logout" id="btnLogout"></button>
       </div>
     </header>
 
@@ -36,7 +37,7 @@
       <div class="card mb-24">
         <div class="card-header">
           <div class="card-title">
-            <div class="card-icon">🔐</div>
+            <div class="card-icon" id="icon2fa"></div>
             <h2>Verificação em Duas Etapas (2FA)</h2>
           </div>
           <span id="badge2fa" class="badge">—</span>
@@ -49,7 +50,7 @@
         <!-- Passo 1: Instruções -->
         <div id="passo1">
           <div class="alert alert-info mb-16">
-            📱 Você precisará do aplicativo <strong>Google Authenticator</strong>, <strong>Authy</strong>
+            <span id="iconApp"></span> Você precisará do aplicativo <strong>Google Authenticator</strong>, <strong>Authy</strong>
             ou qualquer aplicativo compatível com TOTP instalado no seu celular.
           </div>
           <button class="btn btn-primary" id="btnGerar">
@@ -93,7 +94,7 @@
         <!-- Passo 3: Sucesso -->
         <div id="passo3" class="hidden">
           <div class="alert alert-success">
-            ✅ Verificação em duas etapas ativada com sucesso!
+            <span id="iconSucesso"></span> Verificação em duas etapas ativada com sucesso!
             No próximo login, você precisará inserir o código do aplicativo autenticador.
           </div>
           <a href="/" class="btn btn-primary mt-16">Voltar ao Dashboard</a>
@@ -104,7 +105,7 @@
       <div class="card">
         <div class="card-header">
           <div class="card-title">
-            <div class="card-icon">🔑</div>
+            <div class="card-icon" id="iconSenha"></div>
             <h2>Alterar Senha</h2>
           </div>
         </div>
@@ -169,7 +170,12 @@
     if (!Sessao.isLogado()) window.location.replace('/login.html');
 
     document.getElementById('headerNome').textContent = Sessao.nome || 'Usuário';
+    document.getElementById('btnLogout').innerHTML = icon('logOut') + ' Sair';
     document.getElementById('btnLogout').onclick = () => Sessao.logout();
+    document.getElementById('icon2fa').innerHTML   = icon('shield');
+    document.getElementById('iconApp').innerHTML   = icon('smartphone');
+    document.getElementById('iconSenha').innerHTML = icon('key');
+    document.getElementById('iconSucesso').innerHTML = icon('checkCircle', {color:'#1a7a4a'});
     if (Sessao.isAdmin()) document.getElementById('navAdmin').classList.remove('hidden');
 
     let otpauthUrl = '';
@@ -180,13 +186,13 @@
         const u = data.usuario;
         const badge = document.getElementById('badge2fa');
         if (u.totp_ativo) {
-          badge.textContent = '✓ Ativo';
+          badge.innerHTML = icon('check', {size:12}) + ' Ativo';
           badge.className = 'badge ok';
           document.getElementById('desc2fa').textContent =
             'A verificação em duas etapas está ativa na sua conta.';
           document.getElementById('btnGerar').textContent = 'Reconfigurar 2FA (novo dispositivo)';
         } else {
-          badge.textContent = '✗ Inativo';
+          badge.innerHTML = icon('xCircle', {size:12}) + ' Inativo';
           badge.className = 'badge danger';
         }
       } catch (err) {
@@ -239,7 +245,7 @@
         await api('ativar2fa', { codigo });
         document.getElementById('passo2').classList.add('hidden');
         document.getElementById('passo3').classList.remove('hidden');
-        document.getElementById('badge2fa').textContent = '✓ Ativo';
+        document.getElementById('badge2fa').innerHTML = icon('check', {size:12}) + ' Ativo';
         document.getElementById('badge2fa').className = 'badge ok';
       } catch (err) {
         UI.showAlert(document.getElementById('alertaAtivar'), err.message);
