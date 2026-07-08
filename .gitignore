@@ -10,3 +10,8 @@ dist/
 *.dump
 *.bak
 *.zip
+package.json
+pnpm-lock.yaml
+pnpm-workspace.yaml
+yarn.lock
+package-lock.json
